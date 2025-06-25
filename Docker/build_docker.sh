@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DOCKER_IMAGE=${DOCKER_IMAGE:-moska/tidal-connect}
+DOCKER_IMAGE=${DOCKER_IMAGE:-moskakos/tidal-connect}
 
 echo "Building Docker image: ${DOCKER_IMAGE}"
 cd .. &&  docker build -f Docker/Dockerfile -t ${DOCKER_IMAGE} .
