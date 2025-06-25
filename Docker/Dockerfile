@@ -1,6 +1,6 @@
 FROM raspbian/stretch
 
-# 1. Päivitä apt-lähteet ja asenna tarvittavat riippuvuudet
+# Update apt sources and install required dependencies
 RUN echo 'deb http://archive.raspberrypi.org/debian/ stretch main' > /etc/apt/sources.list && \
     echo 'deb http://legacy.raspbian.org/raspbian stretch main contrib non-free rpi firmware' >> /etc/apt/sources.list && \
     echo 'deb-src http://legacy.raspbian.org/raspbian stretch main contrib non-free rpi firmware' >> /etc/apt/sources.list && \
@@ -9,7 +9,7 @@ RUN echo 'deb http://archive.raspberrypi.org/debian/ stretch main' > /etc/apt/so
     apt-get -o Acquire::Check-Valid-Until=false update -y -q && \
     apt-get upgrade -y -q --allow-unauthenticated
 
-# 2. Asenna tarvittavat kirjastot
+# Install required libraries
 RUN apt install --fix-missing --fix-broken -y -q \
     libavformat57 \
     libportaudio2 \
@@ -24,11 +24,18 @@ RUN apt install --fix-missing --fix-broken -y -q \
     libvorbis0a \
     libsoxr0
 
-# Install snapclient from git
-ADD https://github.com/badaix/snapcast/releases/download/v0.27.0/snapclient_0.27.0-1_armhf.deb /tmp/
-RUN apt install -y /tmp/snapclient_0.27.0-1_armhf.deb && rm /tmp/snapclient_0.27.0-1_armhf.deb
+# Install build essentials
+RUN apt-get install -y \
+    git build-essential cmake libasound2-dev libvorbis-dev libflac-dev libavahi-client-dev
 
-# 3. Pakotettu vanha libssl & libcurl riippuvuuksien takia
+# Compile and install Snapcast client
+RUN git clone https://github.com/badaix/snapcast.git /tmp/snapcast && \
+    cd /tmp/snapcast/client && \
+    cmake -DSNAPCLIENT=ON . && \
+    make && make install && \
+    cd / && rm -rf /tmp/snapcast
+
+# Force old libssl & libcurl due to dependency requirements
 RUN curl -k -O -L https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
     apt install -y ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
     rm ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb
@@ -37,7 +44,7 @@ RUN curl -k -O -L https://snapshot.debian.org/archive/debian-security/20190913T1
     apt install -y ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb --allow-downgrades && \
     rm ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb
 
-# 4. Kopioi tarvittavat binäärit ja skriptit
+# Copy required binaries and scripts
 RUN mkdir -p /app/ifi-tidal-release
 WORKDIR /app/ifi-tidal-release
 
@@ -48,11 +55,11 @@ COPY Docker/src/id_certificate id_certificate
 COPY Docker/src/licenses licenses
 RUN chmod a+x bin/*
 
-# 5. Entrypoint
+# Add entrypoint script
 COPY Docker/entrypoint.sh /
 RUN chmod a+x /entrypoint.sh
 
-# 6. Ympäristömuuttujat
+# Set environment variables
 ENV PA_ALSA_PLUGHW=1
 
 ENTRYPOINT ["/entrypoint.sh"]
