@@ -26,7 +26,14 @@ RUN apt install --fix-missing --fix-broken -y -q \
 
 # Install build essentials
 RUN apt-get install -y \
-    git build-essential cmake libasound2-dev libvorbis-dev libflac-dev libavahi-client-dev libssl-dev
+    git build-essential libasound2-dev libvorbis-dev libflac-dev libavahi-client-dev libssl-dev
+
+# Install CMake
+WORKDIR /tmp
+RUN curl -fsSL https://github.com/Kitware/CMake/releases/download/v3.18.6/cmake-3.18.6.tar.gz | tar xz && \
+    cd cmake-3.18.6 && \
+    ./bootstrap && make -j$(nproc) && make install && \
+    cd / && rm -rf /tmp/cmake-3.18.6
 
 # Compile and install Snapcast client
 RUN git clone https://github.com/badaix/snapcast.git /tmp/snapcast && \
