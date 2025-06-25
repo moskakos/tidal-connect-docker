@@ -26,12 +26,12 @@ RUN apt install --fix-missing --fix-broken -y -q \
 
 # Install build essentials
 RUN apt-get install -y \
-    git build-essential cmake libasound2-dev libvorbis-dev libflac-dev libavahi-client-dev
+    git build-essential cmake libasound2-dev libvorbis-dev libflac-dev libavahi-client-dev libssl-dev
 
 # Compile and install Snapcast client
 RUN git clone https://github.com/badaix/snapcast.git /tmp/snapcast && \
     cd /tmp/snapcast/client && \
-    cmake -DSNAPCLIENT=ON . && \
+    cmake -DSNAPCLIENT=ON -DCMAKE_INSTALL_PREFIX=/usr/local . && \
     make && make install && \
     cd / && rm -rf /tmp/snapcast
 
