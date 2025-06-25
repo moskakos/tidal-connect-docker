@@ -9,7 +9,7 @@ RUN echo 'deb http://archive.raspberrypi.org/debian/ stretch main' > /etc/apt/so
     apt-get -o Acquire::Check-Valid-Until=false update -y -q && \
     apt-get upgrade -y -q --allow-unauthenticated
 
-# 2. Asenna tarvittavat kirjastot ja snapclient snapserver-tukea varten
+# 2. Asenna tarvittavat kirjastot
 RUN apt install --fix-missing --fix-broken -y -q \
     libavformat57 \
     libportaudio2 \
@@ -21,9 +21,12 @@ RUN apt install --fix-missing --fix-broken -y -q \
     portaudio19-dev \
     tmux \
     libasound2 \
-    snapclient \
     libvorbis0a \
     libsoxr0
+
+# Install snapclient from git
+ADD https://github.com/badaix/snapcast/releases/download/v0.27.0/snapclient_0.27.0-1_armhf.deb /tmp/
+RUN apt install -y /tmp/snapclient_0.27.0-1_armhf.deb && rm /tmp/snapclient_0.27.0-1_armhf.deb
 
 # 3. Pakotettu vanha libssl & libcurl riippuvuuksien takia
 RUN curl -k -O -L https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
