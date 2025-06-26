@@ -24,24 +24,6 @@ RUN apt install --fix-missing --fix-broken -y -q \
     libvorbis0a \
     libsoxr0
 
-# Install build essentials
-RUN apt-get install -y \
-    git build-essential libasound2-dev libvorbis-dev libflac-dev libavahi-client-dev libssl-dev
-
-# Install CMake
-WORKDIR /tmp
-RUN curl -fsSL https://github.com/Kitware/CMake/releases/download/v3.18.6/cmake-3.18.6.tar.gz | tar xz && \
-    cd cmake-3.18.6 && \
-    ./bootstrap && make -j$(nproc) && make install && \
-    cd / && rm -rf /tmp/cmake-3.18.6
-
-# Compile and install Snapcast client
-RUN git clone https://github.com/badaix/snapcast.git /tmp/snapcast && \
-    cd /tmp/snapcast/client && \
-    cmake -DSNAPCLIENT=ON -DCMAKE_INSTALL_PREFIX=/usr/local . && \
-    make && make install && \
-    cd / && rm -rf /tmp/snapcast
-
 # Force old libssl & libcurl due to dependency requirements
 RUN curl -k -O -L https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
     apt install -y ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
