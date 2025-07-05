@@ -1,3 +1,4 @@
 Docker/.env
 Docker/docker-compose.yml
 ./CONFIG
+*.tar
