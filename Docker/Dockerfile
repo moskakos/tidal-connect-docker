@@ -44,11 +44,13 @@ COPY Docker/src/id_certificate id_certificate
 COPY Docker/src/licenses licenses
 RUN chmod a+x bin/*
 
-# Add entrypoint script
-COPY Docker/entrypoint.sh /
-RUN chmod a+x /entrypoint.sh
-
 # Set environment variables
 ENV PA_ALSA_PLUGHW=1
 
+# Add entrypoint script
+COPY Docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Define entrypoint and default command
 ENTRYPOINT ["/entrypoint.sh"]
+CMD []
