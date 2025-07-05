@@ -2,17 +2,19 @@
 set -e
 
 # Defaults
+# Set audio output device (use environment variable if provided, otherwise default)
 TC_DEVICE="${TC_DEVICE:-plughw:0,0}"
-SNAPCLIENT_DEVICE="${SNAPCLIENT_DEVICE:-plughw:0,1}"
-SNAPSERVER_HOST="${SNAPSERVER_HOST:-127.0.0.1}"
+#SNAPCLIENT_DEVICE="${SNAPCLIENT_DEVICE:-plughw:0,1}"
 
+# Start speaker controller in background
 echo "===> Starting Speaker Controller in tmux session"
 tmux new-session -d -s speaker_controller_application '/app/ifi-tidal-release/bin/speaker_controller_application'
 
-echo "===> Starting Tidal Connect ($TC_DEVICE)"
+# Start Tidal Connect with the configured device
+echo "===> Starting Tidal Connect with device ($TC_DEVICE)"
 /app/ifi-tidal-release/bin/tidal_connect_application \
    --tc-certificate-path "/app/ifi-tidal-release/id_certificate/IfiAudio_ZenStream.dat" \
-   --playback-device "${TC_DEVICE:-plughw:0,0}" \
+   --playback-device "$TC_DEVICE" \
    -f "Tidal Connect (Docker)" \
    --codec-mpegh true \
    --codec-mqa false \
@@ -23,14 +25,8 @@ echo "===> Starting Tidal Connect ($TC_DEVICE)"
    --log-level 3 \
    --enable-websocket-log "0" &
 
+# Wait for processes to finish
 PID_TIDAL=$!
+wait $PID_TIDAL
 
-echo "===> Käynnistetään Snapclient (laite: ${SNAPCLIENT_DEVICE}, isäntä: ${SNAPSERVER_HOST})"
-snapclient -h "${SNAPSERVER_HOST}" --player alsa --device "${SNAPCLIENT_DEVICE}" --hostID tidal-connect-docker &
-
-PID_SNAP=$!
-
-# Wait for both processes to finish
-wait $PID_TIDAL $PID_SNAP
-
-echo "===> TIDAL Connect Container stopped."
+echo "===> TIDAL Connect Container has stopped."
