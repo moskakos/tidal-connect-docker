@@ -19,7 +19,7 @@ error() {
 
 # Set defaults if not provided in environment
 SNAPSERVER_HOST=${SNAPSERVER_HOST:-snapcast}
-SNAPSERVER_PORT=${SNAPSERVER_PORT:-1705}
+SNAPSERVER_API_PORT=${SNAPSERVER_API_PORT:-1780} # API port for Snapserver
 STREAM_PORT=${STREAM_PORT:-5000}
 STREAM_NAME=${STREAM_NAME:-Tidal}
 AUDIO_FORMAT=${AUDIO_FORMAT:-flac}
@@ -29,7 +29,7 @@ CHANNELS=${CHANNELS:-2}
 BUFFER_SIZE=${BUFFER_SIZE:-1024}
 
 info "Starting ffmpeg audio forwarder for Snapserver"
-info "Snapserver: $SNAPSERVER_HOST:$SNAPSERVER_PORT"
+info "Snapserver API: $SNAPSERVER_HOST:$SNAPSERVER_API_PORT"
 info "Stream: $STREAM_NAME on port $STREAM_PORT"
 info "Audio device: $AUDIO_DEVICE ($SAMPLE_RATE Hz, $CHANNELS channels)"
 info "ALSA devices:"
@@ -37,12 +37,13 @@ aplay -l || warning "No ALSA devices found or aplay not available"
 
 # Register stream to snapserver
 info "Registering stream with Snapserver"
-curl -s -X POST http://${SNAPSERVER_HOST}:${SNAPSERVER_PORT}/json \
+curl -s -X POST http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc \
   -H 'Content-Type: application/json' \
-  -d "{\"action\":\"add\",\"stream\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}"
+  -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}"
 
 if [ $? -ne 0 ]; then
   warning "Failed to register stream with Snapserver. Continuing anyway..."
+  warning "Check that Snapserver is running on ${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}"
 fi
 
 # Start audio forwarding

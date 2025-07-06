@@ -32,7 +32,7 @@ services:
       - /dev/snd
     environment:
       - SNAPSERVER_HOST=snapcast
-      - SNAPSERVER_PORT=1705
+      - SNAPSERVER_API_PORT=1780
       - STREAM_PORT=5000
       - STREAM_NAME=Tidal
       - AUDIO_FORMAT=flac
