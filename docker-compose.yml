@@ -42,5 +42,5 @@ services:
       - BUFFER_SIZE=1024
     volumes:
       - /dev/shm:/dev/shm
-      - ffmpeg/entrypoint.sh:/entrypoint.sh:ro
+      - ./ffmpeg/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /bin/bash /entrypoint.sh
