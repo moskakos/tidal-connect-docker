@@ -1,6 +1,26 @@
 #!/bin/bash
 # ffmpeg/ffmpeg-entrypoint.sh
 
+# Function to remove stream from Snapserver
+remove_stream() {
+  # Check if Snapserver parameters are set
+  if [ -z "${SNAPSERVER_HOST}" ] || [ -z "${SNAPSERVER_API_PORT}" ]; then
+    warning "Snapserver parameters not defined, skipping stream removal"
+    return
+  fi
+  
+  info "Removing stream from Snapserver"
+  curl -s -X POST http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc \
+    -H 'Content-Type: application/json' \
+    -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.RemoveStream\", \"params\":{\"id\":\"${STREAM_NAME}\"}}"
+  
+  if [ $? -ne 0 ]; then
+    warning "Failed to remove stream from Snapserver."
+  else
+    info "Stream removed successfully"
+  fi
+}
+
 # Logging functions
 info() {
   echo "[INFO] $1"
@@ -12,23 +32,11 @@ warning() {
 
 error() {
   echo "[ERROR] $1"
+  # Try to clean up the stream
+  remove_stream
   # Wait 2 seconds to make sure logs are visible
   sleep 2
   exit 1
-}
-
-# Function to remove stream from Snapserver
-remove_stream() {
-  info "Removing stream from Snapserver"
-  curl -s -X POST http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc \
-    -H 'Content-Type: application/json' \
-    -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.RemoveStream\", \"params\":{\"id\":\"${STREAM_NAME}\"}}"
-  
-  if [ $? -ne 0 ]; then
-    warning "Failed to remove stream from Snapserver."
-  else
-    info "Stream removed successfully"
-  fi
 }
 
 # Signal handler function
@@ -48,6 +56,8 @@ cleanup() {
 
 # Set up signal trap
 trap cleanup SIGTERM SIGINT
+
+# Loput skriptistä kuten aiemmin...
 
 # Set defaults if not provided in environment
 SNAPSERVER_HOST=${SNAPSERVER_HOST:-snapcast}
