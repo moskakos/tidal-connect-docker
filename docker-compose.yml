@@ -1,0 +1,46 @@
+version: "3.8"
+services:
+  tidal-connect:
+    image: moskakos/tidal-connect
+    container_name: tidal-connect
+    #build:
+    #  context: .
+    #  dockerfile: Docker/Dockerfile
+    restart: always
+    devices:
+      - /dev/snd
+    network_mode: host
+    environment:
+      - OUTPUT_DEVICE='Loopback: PCM (plughw:0,1)'
+      - TC_NAME='Snäpkästi'
+      - TC_MODEL='Tidal Docker'
+      - TC_LOG_LEVEL=4
+      - SC_ENABLE=false
+      - TC_DISABLE_APP_SEC=true
+      - TC_DISABLE_WEB_SEC=true
+    volumes:
+      - /dev/shm:/dev/shm
+
+  tidal-forwarder:
+    image: linuxserver/ffmpeg:latest
+    container_name: tidal-forwarder
+    depends_on:
+      - tidal-connect
+    restart: always
+    network_mode: host
+    devices:
+      - /dev/snd
+    environment:
+      - SNAPSERVER_HOST=snapcast
+      - SNAPSERVER_PORT=1705
+      - STREAM_PORT=5000
+      - STREAM_NAME=Tidal
+      - AUDIO_FORMAT=flac
+      - AUDIO_DEVICE=plughw:Loopback,0
+      - SAMPLE_RATE=44100
+      - CHANNELS=2
+      - BUFFER_SIZE=1024
+    volumes:
+      - /dev/shm:/dev/shm
+      - ffmpeg/ffmpeg-entrypoint.sh:/ffmpeg-entrypoint.sh:ro
+    entrypoint: /bin/bash /ffmpeg-entrypoint.sh
