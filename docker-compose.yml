@@ -20,6 +20,7 @@ services:
       - TC_DISABLE_WEB_SEC=true
     volumes:
       - /dev/shm:/dev/shm
+      - /etc/timezone:/etc/timezone:ro
 
   tidal-forwarder:
     image: linuxserver/ffmpeg:latest
@@ -40,7 +41,10 @@ services:
       - SAMPLE_RATE=44100
       - CHANNELS=2
       - BUFFER_SIZE=1024
+      - AUDIO_BUFFER=2048
+      - AUDIO_QUALITY=8
     volumes:
       - /dev/shm:/dev/shm
+      - /etc/timezone:/etc/timezone:ro
       - ./ffmpeg/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /bin/bash /entrypoint.sh
