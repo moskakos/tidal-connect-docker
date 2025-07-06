@@ -5,15 +5,15 @@ set -e
 
 # Logging functions
 info() {
-  echo "[INFO] $1"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"
 }
 
 warning() {
-  echo "[WARNING] $1"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $1"
 }
 
 error() {
-  echo "[ERROR] $1"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1"
   # Wait 2 seconds to make sure logs are visible
   sleep 2
   exit 1
