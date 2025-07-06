@@ -16,6 +16,7 @@ RUN apt install --fix-missing --fix-broken -y -q \
     libflac++6v5 \
     libavahi-common3 \
     libavahi-client3 \
+    avahi-daemon \
     alsa-utils \
     curl \
     portaudio19-dev \

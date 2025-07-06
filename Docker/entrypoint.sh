@@ -6,6 +6,11 @@ set -e
 TC_DEVICE="${TC_DEVICE:-plughw:0,0}"
 #SNAPCLIENT_DEVICE="${SNAPCLIENT_DEVICE:-plughw:0,1}"
 
+# Start Avahi daemon in background
+echo "===> Starting Avahi daemon"
+service dbus start
+service avahi-daemon start || echo "Avahi daemon failed to start, continuing without it."
+
 # Start speaker controller in background
 echo "===> Starting Speaker Controller in tmux session"
 tmux new-session -d -s speaker_controller_application '/app/ifi-tidal-release/bin/speaker_controller_application'
