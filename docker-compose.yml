@@ -11,7 +11,7 @@ services:
       - /dev/snd
     network_mode: host
     environment:
-      - OUTPUT_DEVICE='Loopback: PCM (plughw:0,1)'
+      - "OUTPUT_DEVICE=Loopback: PCM (plughw:0,1)"
       - TC_NAME='Snäpkästi'
       - TC_MODEL='Tidal Docker'
       - TC_LOG_LEVEL=4
@@ -42,5 +42,5 @@ services:
       - BUFFER_SIZE=1024
     volumes:
       - /dev/shm:/dev/shm
-      - ffmpeg/ffmpeg-entrypoint.sh:/ffmpeg-entrypoint.sh:ro
-    entrypoint: /bin/bash /ffmpeg-entrypoint.sh
+      - ffmpeg/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: /bin/bash /entrypoint.sh
