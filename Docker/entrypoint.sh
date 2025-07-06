@@ -1,5 +1,23 @@
 #!/bin/bash
+# tidal-connect entrypoint.sh
+
 set -e
+
+# Logging functions
+info() {
+  echo "[INFO] $1"
+}
+
+warning() {
+  echo "[WARNING] $1"
+}
+
+error() {
+  echo "[ERROR] $1"
+  # Wait 2 seconds to make sure logs are visible
+  sleep 2
+  exit 1
+}
 
 # Configuration variables with defaults
 # Audio output device
@@ -17,53 +35,43 @@ TC_WEBSOCKET_LOG="${TC_WEBSOCKET_LOG:-0}"
 # Enable or disable speaker controller
 SC_ENABLE="${SC_ENABLE:-true}"
 
-# Helper function for section headers
-header() {
-  echo "===> $1"
-}
-
-# Helper for status messages
-status() {
-  echo "- $1"
-}
-
 # Check system configuration
-header "Checking system configuration"
-status "Audio device: $OUTPUT_DEVICE"
-status "System info: $(uname -a)"
-status "ALSA devices:"
-aplay -l || status "No ALSA devices found or aplay not available"
+info "Checking system configuration"
+info "Audio device: $OUTPUT_DEVICE"
+info "System info: $(uname -a)"
+info "ALSA devices:"
+aplay -l || warning "No ALSA devices found or aplay not available"
 
 # Start required services
-header "Starting dbus service"
+info "Starting dbus service"
 service dbus start
 
-header "Starting Avahi daemon"
+info "Starting Avahi daemon"
 service avahi-daemon start &
 sleep 2
 if pgrep avahi-daemon > /dev/null; then
-  status "Avahi daemon started successfully"
-  avahi-browse -at || status "Cannot browse Avahi services"
+  info "Avahi daemon started successfully"
+  avahi-browse -at || warning "Cannot browse Avahi services"
 else
-  status "Warning: Avahi daemon failed to start"
+  warning "Avahi daemon failed to start"
 fi
 
 # Start speaker controller if enabled
 if [ "$SC_ENABLE" = "true" ]; then
-  header "Starting Speaker Controller"
+  info "Starting Speaker Controller"
   tmux new-session -d -s speaker_controller_application '/app/ifi-tidal-release/bin/speaker_controller_application'
   if [ $? -eq 0 ]; then
-    status "Speaker controller started successfully"
+    info "Speaker controller started successfully"
   else
-    status "Warning: Speaker controller failed to start"
+    warning "Speaker controller failed to start"
   fi
 else
-  header "Speaker Controller is disabled, not starting"
+  info "Speaker Controller is disabled, not starting"
 fi
 
 # Start Tidal Connect
-header "Starting Tidal Connect with device ($OUTPUT_DEVICE)"
-status "Tidal Connect version: $(cat /app/ifi-tidal-release/version.txt 2>/dev/null || echo 'unknown')"
+info "Starting Tidal Connect with device ($OUTPUT_DEVICE)"
+info "Tidal Connect version: $(cat /app/ifi-tidal-release/version.txt 2>/dev/null || echo 'unknown')"
 
 # Run Tidal Connect
 /app/ifi-tidal-release/bin/tidal_connect_application \
@@ -84,17 +92,17 @@ TIDAL_EXIT_CODE=$?
 
 # Error reporting
 if [ $TIDAL_EXIT_CODE -ne 0 ]; then
-  header "ERROR: Tidal Connect exited with code $TIDAL_EXIT_CODE"
-  status "Last 20 lines of system log:"
+  error "Tidal Connect exited with code $TIDAL_EXIT_CODE"
+  info "Last 20 lines of system log:"
   dmesg | tail -20
-  status "Process information:"
-  ps aux | grep -E "tidal|avahi|dbus" || status "No relevant processes found"
-  status "Library dependencies:"
-  ldd /app/ifi-tidal-release/bin/tidal_connect_application || status "ldd command not available"
-  header "Please check the logs above for troubleshooting information."
+  info "Process information:"
+  ps aux | grep -E "tidal|avahi|dbus" || warning "No relevant processes found"
+  info "Library dependencies:"
+  ldd /app/ifi-tidal-release/bin/tidal_connect_application || warning "ldd command not available"
+  error "Please check the logs above for troubleshooting information."
 else
-  header "Tidal Connect exited normally."
+  info "Tidal Connect exited normally."
 fi
 
-header "TIDAL Connect Container has stopped."
+info "TIDAL Connect Container has stopped."
 exit $TIDAL_EXIT_CODE
