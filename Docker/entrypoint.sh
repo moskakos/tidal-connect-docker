@@ -13,6 +13,7 @@ TC_MQA_PASSTHROUGH="${TC_MQA_PASSTHROUGH:-false}"
 TC_DISABLE_APP_SEC="${TC_DISABLE_APP_SECURITY:-false}"
 TC_DISABLE_WEB_SEC="${TC_DISABLE_WEB_SECURITY:-false}"
 TC_LOG_LEVEL="${TC_LOG_LEVEL:-3}"
+TC_WEBSOCKET_LOG="${TC_WEBSOCKET_LOG:-0}"
 # Enable or disable speaker controller
 SC_ENABLE="${SC_ENABLE:-true}"
 
@@ -76,7 +77,7 @@ status "Tidal Connect version: $(cat /app/ifi-tidal-release/version.txt 2>/dev/n
   --disable-app-security "$TC_DISABLE_APP_SEC" \
   --disable-web-security "$TC_DISABLE_WEB_SEC" \
   --log-level "$TC_LOG_LEVEL" \
-  --enable-websocket-log "0"
+  --enable-websocket-log "$TC_WEBSOCKET_LOG"
 
 # Capture exit code
 TIDAL_EXIT_CODE=$?
