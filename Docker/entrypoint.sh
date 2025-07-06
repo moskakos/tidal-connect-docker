@@ -1,76 +1,99 @@
 #!/bin/bash
-
-# Enable better error reporting
 set -e
 
-# Set audio output device
-TC_DEVICE="${TC_DEVICE:-plughw:0,0}"
+# Configuration variables with defaults
+# Audio output device
+OUTPUT_DEVICE="${OUTPUT_DEVICE:-plughw:0,0}"
+# Tidal Connect configuration
+TC_NAME="${TC_NAME:-Tidal Connect (Docker)}"
+TC_MODEL="${TC_MODEL:-Tidal Docker}"
+TC_CODEC_MPEGH="${TC_CODEC_MPEGH:-true}"
+TC_CODEC_MQA="${TC_CODEC_MQA:-false}"
+TC_MQA_PASSTHROUGH="${TC_MQA_PASSTHROUGH:-false}"
+TC_DISABLE_APP_SEC="${TC_DISABLE_APP_SECURITY:-false}"
+TC_DISABLE_WEB_SEC="${TC_DISABLE_WEB_SECURITY:-false}"
+TC_LOG_LEVEL="${TC_LOG_LEVEL:-3}"
+# Enable or disable speaker controller
+SC_ENABLE="${SC_ENABLE:-true}"
 
-echo "===> Checking system configuration"
-echo "- Audio device: $TC_DEVICE"
-echo "- System info: $(uname -a)"
-echo "- ALSA devices:"
-aplay -l || echo "  No ALSA devices found or aplay not available"
+# Helper function for section headers
+header() {
+  echo "===> $1"
+}
 
-# Start necessary services
-echo "===> Starting dbus service"
+# Helper for status messages
+status() {
+  echo "- $1"
+}
+
+# Check system configuration
+header "Checking system configuration"
+status "Audio device: $OUTPUT_DEVICE"
+status "System info: $(uname -a)"
+status "ALSA devices:"
+aplay -l || status "No ALSA devices found or aplay not available"
+
+# Start required services
+header "Starting dbus service"
 service dbus start
 
-echo "===> Starting Avahi daemon"
+header "Starting Avahi daemon"
 service avahi-daemon start &
-# Give Avahi time to start properly
 sleep 2
-# Check if Avahi is actually running
 if pgrep avahi-daemon > /dev/null; then
-  echo "- Avahi daemon started successfully"
-  avahi-browse -at || echo "  Cannot browse Avahi services"
+  status "Avahi daemon started successfully"
+  avahi-browse -at || status "Cannot browse Avahi services"
 else
-  echo "- Warning: Avahi daemon failed to start"
+  status "Warning: Avahi daemon failed to start"
 fi
 
-# Start speaker controller in background
-echo "===> Starting Speaker Controller"
-tmux new-session -d -s speaker_controller_application '/app/ifi-tidal-release/bin/speaker_controller_application'
-if [ $? -eq 0 ]; then
-  echo "- Speaker controller started successfully"
+# Start speaker controller if enabled
+if [ "$SC_ENABLE" = "true" ]; then
+  header "Starting Speaker Controller"
+  tmux new-session -d -s speaker_controller_application '/app/ifi-tidal-release/bin/speaker_controller_application'
+  if [ $? -eq 0 ]; then
+    status "Speaker controller started successfully"
+  else
+    status "Warning: Speaker controller failed to start"
+  fi
 else
-  echo "- Warning: Speaker controller failed to start"
+  header "Speaker Controller is disabled, not starting"
 fi
 
-# Start Tidal Connect with the configured device
-echo "===> Starting Tidal Connect with device ($TC_DEVICE)"
-echo "- Tidal Connect version: $(cat /app/ifi-tidal-release/version.txt 2>/dev/null || echo 'unknown')"
+# Start Tidal Connect
+header "Starting Tidal Connect with device ($OUTPUT_DEVICE)"
+status "Tidal Connect version: $(cat /app/ifi-tidal-release/version.txt 2>/dev/null || echo 'unknown')"
 
-# Run Tidal Connect with proper error handling
+# Run Tidal Connect
 /app/ifi-tidal-release/bin/tidal_connect_application \
-   --tc-certificate-path "/app/ifi-tidal-release/id_certificate/IfiAudio_ZenStream.dat" \
-   --playback-device "$TC_DEVICE" \
-   -f "Tidal Connect (Docker)" \
-   --codec-mpegh true \
-   --codec-mqa false \
-   --model-name "Tidal Docker" \
-   --disable-app-security true \
-   --disable-web-security true \
-   --enable-mqa-passthrough false \
-   --log-level 4 \
-   --enable-websocket-log "0"
+  --tc-certificate-path "/app/ifi-tidal-release/id_certificate/IfiAudio_ZenStream.dat" \
+  --playback-device "$OUTPUT_DEVICE" \
+  -f "$TC_NAME" \
+  --model-name "$TC_MODEL" \
+  --codec-mpegh "$TC_CODEC_MPEGH" \
+  --codec-mqa "$TC_CODEC_MQA" \
+  --enable-mqa-passthrough "$TC_MQA_PASSTHROUGH" \
+  --disable-app-security "$TC_DISABLE_APP_SEC" \
+  --disable-web-security "$TC_DISABLE_WEB_SEC" \
+  --log-level "$TC_LOG_LEVEL" \
+  --enable-websocket-log "0"
 
-# Capture the exit code
+# Capture exit code
 TIDAL_EXIT_CODE=$?
 
-# Print detailed error information if there was an issue
+# Error reporting
 if [ $TIDAL_EXIT_CODE -ne 0 ]; then
-  echo "===> ERROR: Tidal Connect exited with code $TIDAL_EXIT_CODE"
-  echo "- Last 20 lines of system log:"
+  header "ERROR: Tidal Connect exited with code $TIDAL_EXIT_CODE"
+  status "Last 20 lines of system log:"
   dmesg | tail -20
-  echo "- Process information:"
-  ps aux | grep -E "tidal|avahi|dbus" || echo "  No relevant processes found"
-  echo "- Library dependencies:"
-  ldd /app/ifi-tidal-release/bin/tidal_connect_application || echo "  ldd command not available"
-  echo "===> Please check the logs above for troubleshooting information."
+  status "Process information:"
+  ps aux | grep -E "tidal|avahi|dbus" || status "No relevant processes found"
+  status "Library dependencies:"
+  ldd /app/ifi-tidal-release/bin/tidal_connect_application || status "ldd command not available"
+  header "Please check the logs above for troubleshooting information."
 else
-  echo "===> Tidal Connect exited normally."
+  header "Tidal Connect exited normally."
 fi
 
-echo "===> TIDAL Connect Container has stopped."
+header "TIDAL Connect Container has stopped."
 exit $TIDAL_EXIT_CODE
