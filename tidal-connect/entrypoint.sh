@@ -1,23 +1,6 @@
 #!/bin/bash
 # tidal-connect/entrypoint.sh
-
 set -e
-
-# Logging functions
-info() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"
-}
-
-warning() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $1"
-}
-
-error() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1"
-  # Wait 2 seconds to make sure logs are visible
-  sleep 2
-  exit 1
-}
 
 # Configuration variables with defaults
 # Audio output device
@@ -35,6 +18,33 @@ TC_WEBSOCKET_LOG="${TC_WEBSOCKET_LOG:-0}"
 # Enable or disable speaker controller
 SC_ENABLE="${SC_ENABLE:-true}"
 
+# Logging functions
+info() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"
+}
+
+warning() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $1"
+}
+
+error() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1"
+  # Wait 2 seconds to make sure logs are visible
+  sleep 2
+  exit 1
+}
+
+cleanup() {
+  info "Container stopping, cleaning up..."
+  tmux kill-session -t speaker_controller_application 2>/dev/null || true
+  pkill -f speaker_controller_application || true
+  pkill -f tidal_connect_application || true
+  service avahi-daemon stop || true
+  service dbus stop || true
+}
+
+trap cleanup SIGTERM SIGINT
+
 # Check system configuration
 info "Checking system configuration"
 info "Audio device: $OUTPUT_DEVICE"
@@ -47,7 +57,7 @@ info "Starting dbus service"
 service dbus start
 
 info "Starting Avahi daemon"
-service avahi-daemon start &
+service avahi-daemon start
 sleep 2
 if pgrep avahi-daemon > /dev/null; then
   info "Avahi daemon started successfully"
