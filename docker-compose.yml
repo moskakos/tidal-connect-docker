@@ -15,7 +15,7 @@ services:
       - TC_NAME=Snäpkästi
       - TC_MODEL=Tidal Docker
       - TC_LOG_LEVEL=4
-      - SC_ENABLE=false
+      - SC_ENABLE=true
       - TC_DISABLE_APP_SEC=true
       - TC_DISABLE_WEB_SEC=true
     volumes:
