@@ -48,7 +48,7 @@ services:
       - CHANNELS=2
       - BUFFER_SIZE=1024
       - AUDIO_BUFFER=2048
-      - AUDIO_QUALITY=8
+      - FLAC_COMPRESSION_LEVEL=8
     volumes:
       - /dev/shm:/dev/shm
       - /etc/timezone:/etc/timezone:ro

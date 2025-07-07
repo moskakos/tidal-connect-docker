@@ -103,7 +103,7 @@ ffmpeg -hide_banner -loglevel info \
   -buffer_size ${BUFFER_SIZE} \
   -af "aresample=async=1000:min_hard_comp=0.01:first_pts=0" \
   -c:a ${FFMPEG_AUDIO_CODEC} \
-  -compression_level ${AUDIO_QUALITY} \
+  -compression_level ${FLAC_COMPRESSION_LEVEL} \
   -frame_size ${AUDIO_BUFFER} \
   -application audio \
   -fflags nobuffer \
