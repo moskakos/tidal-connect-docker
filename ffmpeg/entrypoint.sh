@@ -85,7 +85,7 @@ aplay -l || warning "No ALSA devices found or aplay not available"
 info "Registering stream with Snapserver"
 curl -s -X POST http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc \
   -H 'Content-Type: application/json' \
-  -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&codec=${SC_AUDIO_FORMAT}&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}"
+  -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&codec=${SC_AUDIO_CODEC}&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}"
 
 if [ $? -ne 0 ]; then
   warning "Failed to register stream with Snapserver. Continuing anyway..."
