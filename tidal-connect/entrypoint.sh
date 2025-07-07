@@ -95,8 +95,13 @@ info "Tidal Connect version: $(cat /app/ifi-tidal-release/version.txt 2>/dev/nul
   --disable-app-security "$TC_DISABLE_APP_SEC" \
   --disable-web-security "$TC_DISABLE_WEB_SEC" \
   --log-level "$TC_LOG_LEVEL" \
-  --enable-websocket-log "$TC_WEBSOCKET_LOG"
+  --enable-websocket-log "$TC_WEBSOCKET_LOG" &
 
+TIDAL_PID=$!
+info "Tidal Connect started with PID $TIDAL_PID"
+
+# Wait for Tidal Connect to exit
+wait $TIDAL_PID
 # Capture exit code
 TIDAL_EXIT_CODE=$?
 
