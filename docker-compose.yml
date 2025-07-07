@@ -40,7 +40,7 @@ services:
       - FFMPEG_AUDIO_FORMAT=s16le
       # Audio codec for FFmpeg, e.g. flac or pcm_s16le for PCM
       - FFMPEG_AUDIO_CODEC=pcm_s16le
-      # Audio codec for Snapcast stream
+      # Audio codec for Snapcast stream, e.g. flac or pcm
       # See https://github.com/badaix/snapcast/blob/develop/doc/configuration.md
       - SC_AUDIO_CODEC=pcm
       - AUDIO_DEVICE=plughw:Loopback,0
