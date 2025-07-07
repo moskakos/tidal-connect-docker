@@ -64,7 +64,9 @@ SNAPSERVER_HOST=${SNAPSERVER_HOST:-snapcast}
 SNAPSERVER_API_PORT=${SNAPSERVER_API_PORT:-1780}
 STREAM_PORT=${STREAM_PORT:-5000}
 STREAM_NAME=${STREAM_NAME:-Tidal}
-AUDIO_FORMAT=${AUDIO_FORMAT:-flac}
+FFMPEG_AUDIO_FORMAT=${FFMPEG_AUDIO_FORMAT:-flac}
+FFMPEG_AUDIO_CODEC=${FFMPEG_AUDIO_CODEC:-flac}
+SC_AUDIO_CODEC=${SC_AUDIO_CODEC:-flac}
 AUDIO_DEVICE=${AUDIO_DEVICE:-plughw:Loopback,0}
 SAMPLE_RATE=${SAMPLE_RATE:-44100}
 CHANNELS=${CHANNELS:-2}
@@ -83,7 +85,7 @@ aplay -l || warning "No ALSA devices found or aplay not available"
 info "Registering stream with Snapserver"
 curl -s -X POST http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc \
   -H 'Content-Type: application/json' \
-  -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&codec=${AUDIO_FORMAT}&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}"
+  -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&codec=${SC_AUDIO_FORMAT}&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}"
 
 if [ $? -ne 0 ]; then
   warning "Failed to register stream with Snapserver. Continuing anyway..."
@@ -100,14 +102,14 @@ ffmpeg -hide_banner -loglevel info \
   -i ${AUDIO_DEVICE} \
   -buffer_size ${BUFFER_SIZE} \
   -af "aresample=async=1000:min_hard_comp=0.01:first_pts=0" \
-  -c:a ${AUDIO_FORMAT} \
+  -c:a ${FFMPEG_AUDIO_CODEC} \
   -compression_level ${AUDIO_QUALITY} \
   -frame_size ${AUDIO_BUFFER} \
   -application audio \
   -fflags nobuffer \
   -flags low_delay \
   -max_delay 500000 \
-  -f ${AUDIO_FORMAT} \
+  -f ${FFMPEG_AUDIO_FORMAT} \
   tcp://${SNAPSERVER_HOST}:${STREAM_PORT} &
 
 # Save ffmpeg PID so we can terminate it properly

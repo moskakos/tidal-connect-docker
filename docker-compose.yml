@@ -36,7 +36,13 @@ services:
       - SNAPSERVER_API_PORT=1780
       - STREAM_PORT=5000
       - STREAM_NAME=Tidal
-      - AUDIO_FORMAT=wav
+      # Audio format for FFmpeg, e.g. flac or s16le for PCM
+      - FFMPEG_AUDIO_FORMAT=s16le
+      # Audio codec for FFmpeg, e.g. flac or pcm_s16le for PCM
+      - FFMPEG_AUDIO_CODEC=pcm_s16le
+      # Audio codec for Snapcast stream
+      # See https://github.com/badaix/snapcast/blob/develop/doc/configuration.md
+      - SC_AUDIO_CODEC=pcm
       - AUDIO_DEVICE=plughw:Loopback,0
       - SAMPLE_RATE=44100
       - CHANNELS=2
