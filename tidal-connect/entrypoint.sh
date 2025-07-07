@@ -1,5 +1,5 @@
 #!/bin/bash
-# tidal-connect entrypoint.sh
+# tidal-connect/entrypoint.sh
 
 set -e
 

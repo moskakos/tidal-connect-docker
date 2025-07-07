@@ -1,5 +1,5 @@
 #!/bin/bash
-# ffmpeg/ffmpeg-entrypoint.sh
+# ffmpeg/entrypoint.sh
 
 # Function to remove stream from Snapserver
 remove_stream() {
