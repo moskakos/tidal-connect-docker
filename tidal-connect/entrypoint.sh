@@ -11,8 +11,8 @@ TC_MODEL="${TC_MODEL:-Tidal Docker}"
 TC_CODEC_MPEGH="${TC_CODEC_MPEGH:-true}"
 TC_CODEC_MQA="${TC_CODEC_MQA:-false}"
 TC_MQA_PASSTHROUGH="${TC_MQA_PASSTHROUGH:-false}"
-TC_DISABLE_APP_SEC="${TC_DISABLE_APP_SECURITY:-false}"
-TC_DISABLE_WEB_SEC="${TC_DISABLE_WEB_SECURITY:-false}"
+TC_DISABLE_APP_SEC="${TC_DISABLE_APP_SEC:-false}"
+TC_DISABLE_WEB_SEC="${TC_DISABLE_WEB_SEC:-false}"
 TC_LOG_LEVEL="${TC_LOG_LEVEL:-3}"
 TC_WEBSOCKET_LOG="${TC_WEBSOCKET_LOG:-0}"
 # Enable or disable speaker controller
@@ -36,9 +36,14 @@ error() {
 
 cleanup() {
   info "Container stopping, cleaning up..."
+  if [ -n "$TIDAL_PID" ] && kill -0 "$TIDAL_PID" 2>/dev/null; then
+    info "Sending SIGTERM to Tidal Connect (PID $TIDAL_PID)"
+    kill -TERM "$TIDAL_PID"
+    # Wait for the process to exit
+    wait "$TIDAL_PID"
+  fi
   tmux kill-session -t speaker_controller_application 2>/dev/null || true
   pkill -f speaker_controller_application || true
-  pkill -f tidal_connect_application || true
   service avahi-daemon stop || true
   service dbus stop || true
 }
