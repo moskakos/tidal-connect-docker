@@ -1,7 +1,0 @@
-#!/bin/bash
-
-LEFT_BOUNDARY=xartists:
-RIGHT_BOUNDARY=xxsession
-
-docker exec -ti tidal_connect /usr/bin/tmux capture-pane -pS -100 | sed -n "s/^${LEFT_BOUNDARY}\s*\(.*\)${RIGHT_BOUNDARY}.*$/\1/p"
-

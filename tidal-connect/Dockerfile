@@ -38,18 +38,18 @@ RUN curl -k -O -L https://snapshot.debian.org/archive/debian-security/20190913T1
 RUN mkdir -p /app/ifi-tidal-release
 WORKDIR /app/ifi-tidal-release
 
-COPY Docker/src/bin/ bin
-COPY Docker/src/pa_devs/ .
-COPY Docker/src/play .
-COPY Docker/src/id_certificate id_certificate
-COPY Docker/src/licenses licenses
+COPY src/bin/ bin
+COPY src/pa_devs/ .
+COPY src/play .
+COPY src/id_certificate id_certificate
+COPY src/licenses licenses
 RUN chmod a+x bin/*
 
 # Set environment variables
 ENV PA_ALSA_PLUGHW=1
 
 # Add entrypoint script
-COPY Docker/entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Define entrypoint and default command

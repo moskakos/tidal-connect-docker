@@ -1,7 +1,0 @@
-#!/bin/bash
-
-LEFT_BOUNDARY="xalbum name:"
-RIGHT_BOUNDARY=xxapp_id
-
-docker exec -ti docker_tidal-connect_1 /usr/bin/tmux capture-pane -pS -100 | sed -n "s/^${LEFT_BOUNDARY}\s*\(.*\)${RIGHT_BOUNDARY}.*$/\1/p"
-

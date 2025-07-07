@@ -1,6 +1,0 @@
-#!/bin/bash
-
-# This started from the entrypoint.sh: tmux new-session -d -s speaker_controller_application '/app/ifi-tidal-release/bin/speaker_controller_application'
-
-docker exec -ti docker_tidal-connect_1 /usr/bin/tmux attach-session -t speaker_controller_application
-

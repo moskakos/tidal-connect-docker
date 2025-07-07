@@ -1,8 +1,0 @@
-nowPlayingController.metadata.album
-nowPlayingController.metadata.artist='WHATEVER';
-nowPlayingController.metadata.title='BLABL';
-
-
-http://10.0.1.9:81/api/player/status
-http://10.0.1.9:81/api/track/metadata
-

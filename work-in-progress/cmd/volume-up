@@ -1,5 +1,0 @@
-#!/bin/bash
-
-TMUX_SESSION=speaker_controller_application
-TMUX_KEYSTROKE="+"
-docker exec -ti docker_tidal-connect_1 /usr/bin/tmux send-keys -t ${TMUX_SESSION}.0 ${TMUX_KEYSTROKE}

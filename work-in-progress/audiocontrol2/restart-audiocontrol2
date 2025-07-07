@@ -1,8 +1,0 @@
-#!/bin/bash
-
-echo "Stopping audiocontrol2"
-systemctl stop audiocontrol2
-
-echo "Starting audiocontrol2"
-systemctl start audiocontrol2
-
