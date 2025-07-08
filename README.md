@@ -90,10 +90,15 @@ Snapclient(s)
 - **Other Parameters:**  
   Sample rate, channels, buffer sizes, and more can be set in `docker-compose.yml`.
 
+## Issues, bugs and limitations
+
+- FLAC compression from FFmpeg to Snapserver seems to cause audio issues. PCM works.
+- `tidal-connect/src/bin/tidal_connect_application` accepts TIDAL *High* quality, no *Max*. *High* still should be CD quality (16/44.1 lossless FLAC).
+
 ## Troubleshooting
 
 - Make sure your user has access to `/dev/snd` and the ALSA loopback module is loaded.
-- If you have no audio, check device names with `aplay -l` inside the container.
+- Follow container's logs immediatelly after starting with `docker-compose up -d && docker-compose logs -f`.
 - For Snapcast issues, verify the stream registration and Snapserver logs.
 
 ## Credits
