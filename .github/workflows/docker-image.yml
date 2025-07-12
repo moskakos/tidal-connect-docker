@@ -40,7 +40,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          context: ./tidal-connect
+          context: ${{ github.workspace }}/tidal-connect
           file: Dockerfile
           platforms: linux/arm64
           push: true
