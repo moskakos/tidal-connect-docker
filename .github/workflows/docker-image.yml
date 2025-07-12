@@ -40,10 +40,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          context: tidal-connect
-          file: tidal-connect/Dockerfile 
+          context: ./tidal-connect
+          file: ./tidal-connect/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=moskakos/tidal-connect:buildcache
-          cache-to: type=registry,ref=moskakos/tidal-connect:buildcache,mode=max
+          no-cache: true
