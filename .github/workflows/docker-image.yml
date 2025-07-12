@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: your-dockerhub-username/tidal-connect
+          images: moskakos/tidal-connect
           tags: |
             type=raw,value=latest
             type=sha,format=short
@@ -44,5 +44,5 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=your-dockerhub-username/tidal-connect:buildcache
-          cache-to: type=registry,ref=your-dockerhub-username/tidal-connect:buildcache,mode=max
+          cache-from: type=registry,ref=moskakos/tidal-connect:buildcache
+          cache-to: type=registry,ref=moskakos/tidal-connect:buildcache,mode=max
