@@ -1,5 +1,6 @@
 #!/bin/bash
 # tidal-connect/entrypoint.sh
+# Test change
 set -e
 
 # Configuration variables with defaults
