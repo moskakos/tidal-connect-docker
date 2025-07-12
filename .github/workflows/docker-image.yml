@@ -40,8 +40,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          context: tidal-connect/
-          file: ./Dockerfile
+          context: ./tidal-connect
+          file: ./tidal-connect/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
