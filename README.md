@@ -90,10 +90,43 @@ Snapclient(s)
 - **Other Parameters:**  
   Sample rate, channels, buffer sizes, and more can be set in `docker-compose.yml`.
 
+## Configuration options
+
+| Variable                | Container        | Description                                          | Example value                        |
+|-------------------------|------------------|------------------------------------------------------|--------------------------------------|
+| `OUTPUT_DEVICE`         | tidal-connect    | ALSA device for Tidal Connect audio output           | `Loopback: PCM (plughw:0,1)`         |
+| `TC_NAME`               | tidal-connect    | Device name shown in TIDAL app                       | `Snapcast multiroom`                 |
+| `TC_MODEL`              | tidal-connect    | Model name 🤷                                        | `Tidal Docker`                       |
+| `TC_LOG_LEVEL`          | tidal-connect    | Log verbosity (0=quiet, 4=debug)                     | `1`                                  |
+| `TC_DISABLE_APP_SEC`    | tidal-connect    | Disable app security checks                          | `true` or `false`                    |
+| `TC_DISABLE_WEB_SEC`    | tidal-connect    | Disable web security checks                          | `true` or `false`                    |
+| `SC_ENABLE`             | tidal-connect    | Enable `speaker_controller_application`              | `true` or `false`                    |
+| `SNAPSERVER_HOST`       | tidal-forwarder  | Hostname or IP of Snapserver                         | `snapcast.local`                     |
+| `SNAPSERVER_API_PORT`   | tidal-forwarder  | Snapserver API port                                  | `1780`                               |
+| `STREAM_NAME`           | tidal-forwarder  | Stream name registered in Snapserver                 | `Tidal`                              |
+| `STREAM_PORT`           | tidal-forwarder  | TCP port for audio stream to Snapserver              | `5000`                               |
+| `FFMPEG_AUDIO_FORMAT`   | tidal-forwarder  | FFmpeg output format[^1]                             | `s16le` (PCM) or `flac`              |
+| `FFMPEG_AUDIO_CODEC`    | tidal-forwarder  | FFmpeg audio codec[^2]                               | `pcm_s16le` (PCM) or `flac`          |
+| `SC_AUDIO_CODEC`        | tidal-forwarder  | Codec type for Snapcast[^3] stream registration      | `pcm` or `flac`                      |
+| `AUDIO_DEVICE`          | tidal-forwarder  | ALSA device FFmpeg reads from (loopback)             | `plughw:Loopback,0`                  |
+| `SAMPLE_RATE`           | tidal-forwarder  | Audio sample rate (Hz)                               | `44100`                              |
+| `CHANNELS`              | tidal-forwarder  | Number of audio channels                             | `2`                                  |
+| `BUFFER_SIZE`           | tidal-forwarder  | FFmpeg buffer size                                   | `1024`                               |
+| `AUDIO_BUFFER`          | tidal-forwarder  | Audio frame buffer size                              | `2048`                               |
+| `FLAC_COMPRESSION_LEVEL`| tidal-forwarder  | FLAC compression level (1=fastest, 8=highest compression) | `8`                             |
+
+**Note:**  
+- All variables can be set in `docker-compose.yml` under the appropriate service.
+- PCM (`s16le`/`pcm_s16le`/`pcm`) is recommended for best reliability.
+
+Also please note that I have no idea what all the parameters in `/bin/tidal_connect_application` actually do. I wanted to expose them just in case.
+
 ## Issues, bugs and limitations
 
 - FLAC compression from FFmpeg to Snapserver seems to cause audio issues. PCM works.
-- `tidal-connect/src/bin/tidal_connect_application` accepts TIDAL *High* quality, no *Max*. *High* still should be CD quality (16/44.1 lossless FLAC).
+- `/bin/tidal_connect_application` accepts TIDAL *High* quality at best - no *Max*. *High* still should be CD quality (lossless 16/44.1).
+- `TC_DISABLE_APP_SEC` and `TC_DISABLE_WEB_SEC` set to `false` didn't work for me.
+- The tidal-connect container runs Debian 9 (stretch). I haven't been able to get `/bin/tidal_connect_application` to work in newer OSes.
 
 ## Troubleshooting
 
@@ -104,3 +137,9 @@ Snapclient(s)
 ## Credits
 
 - Based on [TonyTromp/tidal-connect-docker](https://github.com/TonyTromp/tidal-connect-docker)
+
+-----
+
+[^1]: See `ffmpeg -formats` and https://trac.ffmpeg.org/wiki/audio%20types
+[^2]: https://ffmpeg.org/ffmpeg-codecs.html#Audio-Encoders
+[^3]: https://github.com/badaix/snapcast/blob/develop/doc/configuration.md
