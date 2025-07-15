@@ -3,11 +3,11 @@
 
 DOCKER_HOST=${DOCKER_HOST:-"tidal"}
 CONTAINER_NAME=${CONTAINER_NAME:-"moskakos/tidal-connect"}
+CONTAINER_DIR=${CONTAINER_DIR:-"tidal-connect-docker"}
 
 # SSH into the Docker host and stop & remove the container
-ssh "$DOCKER_HOST" "docker stop $CONTAINER_NAME || true && \
-    docker rm $CONTAINER_NAME || true && \
-    docker image rm $CONTAINER_NAME || true"
+ssh "$DOCKER_HOST" "cd '$CONTAINER_DIR' && \
+                    docker-compose down --rmi all || true"
 
 # Build the Docker image and transfer it to the Docker host
 docker build --no-cache -f Dockerfile -t "$CONTAINER_NAME" .
