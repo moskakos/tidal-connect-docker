@@ -1,6 +1,6 @@
 # Tidal Connect Docker with Snapcast integration
 
-This project provides a Docker-based solution for running TIDAL Connect and forwarding audio to Snapcast for multi-room audio playback in arm64 based systems. It consists of two containers: one for the Tidal Connect client and another for an FFmpeg-based audio forwarder. This project assumes you already have a Snapserver and Snapclients configured.
+This project provides a Docker-based solution for running TIDAL Connect and forwarding audio to Snapcast for multi-room audio playback in ARM-based systems (both 32-bit armv7/armhf and 64-bit arm64/aarch64). It consists of two containers: one for the Tidal Connect client and another for an FFmpeg-based audio forwarder. This project assumes you already have a Snapserver and Snapclients configured.
 
 ## How does this work?
 
@@ -33,8 +33,8 @@ Snapclient(s)
 
 ## Prerequisites
 
-- **arm64 Docker host:**  
-  This project works only in a 64-bit ARM (arm64/aarch64) Linux system, such as Raspberry Pi 3/4 or [arm64 emulated VM](https://rotelok.com/installing-arm64-debian-10-buster-in-a-virtual-machine/) running a 64-bit OS.
+- **ARM Docker host:**  
+  This project works on both 32-bit ARM (armv7/armhf) and 64-bit ARM (arm64/aarch64) Linux systems, such as Raspberry Pis or [ARM emulated VM](https://rotelok.com/installing-arm64-debian-10-buster-in-a-virtual-machine/).
 
 - **ALSA Loopback device:**  
   The ALSA loopback kernel module (`snd-aloop`) must be available and loaded on the Docker host.  
@@ -126,7 +126,7 @@ Also please note that I have no idea what all the parameters in `/bin/tidal_conn
 - FLAC compression from FFmpeg to Snapserver seems to cause audio issues. PCM works.
 - `/bin/tidal_connect_application` accepts TIDAL *High* quality at best - no *Max*. *High* still should be CD quality (lossless 16/44.1).
 - `TC_DISABLE_APP_SEC` and `TC_DISABLE_WEB_SEC` set to `false` didn't work for me.
-- The tidal-connect container runs Debian 9 (stretch). I haven't been able to get `/bin/tidal_connect_application` to work in newer OSes.
+- The tidal-connect container runs Debian 9 (stretch). `/bin/tidal_connect_application` requires an old operating system and does not work on newer OS versions. The Docker image is built for ARM (armv7/armhf), but also works on ARM64 devices when Docker uses proper emulation.
 
 ## Troubleshooting
 
