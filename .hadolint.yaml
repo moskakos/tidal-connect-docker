@@ -1,0 +1,21 @@
+# Hadolint configuration
+#
+# Foundation policy: only "error" severity fails the build. Warnings are
+# reported but tolerated, because the vendor-binary container has many
+# unavoidable apt patterns (snapshot.debian.org URLs, deliberately old
+# versions). The base-image-modernizer agent will revisit this.
+
+failure-threshold: error
+
+# Specific rules we explicitly accept for this repository.
+ignored:
+  # DL3008 — pin apt versions. We pin via snapshot.debian.org URLs for the
+  # security-critical openssl/curl libs; regular apt packages stay pinned
+  # by the Debian release codename in the base image.
+  - DL3008
+  # DL3009 — delete apt cache. Adding this is a separate hardening task
+  # tracked by the security-hardener agent, not a foundation concern.
+  - DL3009
+  # DL3015 — --no-install-recommends. Some recommends pulled in by
+  # `apt install` here (e.g. avahi-daemon) are actually required.
+  - DL3015

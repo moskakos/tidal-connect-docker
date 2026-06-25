@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Hadolint (tidal-connect/Dockerfile)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: tidal-connect/Dockerfile
+          failure-threshold: error
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+        with:
+          scandir: "."
+          severity: error
+          format: gcc
+
+      - name: docker compose config
+        run: docker compose -f docker-compose.yml config --quiet
+
+  build-and-ldd:
+    name: Build & ldd (${{ matrix.arch }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/arm/v7
+            arch: armv7
+          - platform: linux/arm64
+            arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build tidal-connect image (${{ matrix.platform }})
+        uses: docker/build-push-action@v5
+        with:
+          context: tidal-connect
+          file: tidal-connect/Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: tidal-connect:ci-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.arch }},mode=max
+
+      - name: Verify shared-library resolution (ldd)
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          out="artifacts/ldd-${{ matrix.arch }}.txt"
+          docker run --rm --platform ${{ matrix.platform }} \
+            --entrypoint /bin/bash tidal-connect:ci-${{ matrix.arch }} \
+            -c 'ldd /app/ifi-tidal-release/bin/tidal_connect_application' \
+            | tee "$out"
+          if grep -E 'not found' "$out" > /dev/null; then
+            echo "::error::Unresolved shared libraries in tidal_connect_application on ${{ matrix.platform }}"
+            exit 1
+          fi
+          echo "All shared libraries resolved on ${{ matrix.platform }}"
+
+      - name: Upload ldd report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldd-${{ matrix.arch }}
+          path: artifacts/
+          retention-days: 14
