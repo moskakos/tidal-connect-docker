@@ -25,6 +25,8 @@ services:
   tidal-forwarder:
     image: linuxserver/ffmpeg:latest
     container_name: tidal-forwarder
+    profiles:
+      - ffmpeg
     depends_on:
       - tidal-connect
     restart: always
@@ -54,3 +56,28 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - ./ffmpeg/entrypoint.sh:/entrypoint.sh:ro
     entrypoint: /bin/bash /entrypoint.sh
+
+  tidal-forwarder-arecord:
+    build:
+      context: forwarder-arecord
+      dockerfile: Dockerfile
+    container_name: tidal-forwarder-arecord
+    profiles:
+      - arecord
+    depends_on:
+      - tidal-connect
+    restart: always
+    network_mode: host
+    devices:
+      - /dev/snd
+    environment:
+      - SNAPSERVER_HOST=snapcast
+      - SNAPSERVER_API_PORT=1780
+      - STREAM_PORT=5000
+      - STREAM_NAME=Tidal
+      - AUDIO_DEVICE=plughw:Loopback,0
+      - SAMPLE_RATE=44100
+      - CHANNELS=2
+    volumes:
+      - /dev/shm:/dev/shm
+      - /etc/timezone:/etc/timezone:ro

@@ -20,14 +20,22 @@ the host).
    vendor's license terms.
 2. **Never delete or move `tidal-connect/src/id_certificate/`.** The binary
    loads `IfiAudio_ZenStream.dat` from this directory at runtime.
-3. **The base image must satisfy these runtime requirements** (verify with
-   `ldd` after any base-image change):
-   - `libssl.so.1.0.0` (Debian 8/9-era OpenSSL 1.0.x)
-   - `libcurl.so.4` linked against the matching OpenSSL ABI
-   - `libavformat.so.57`, `libflac++.so.6`, `libavahi-client.so.3`,
-     `libportaudio.so.2`, `libsoxr.so.0`
-   - `glibc` version compatible with the binary's expectations (Debian 11
-     usually works; Debian 12 needs testing).
+3. **The base image must satisfy these runtime requirements** (verified by
+   `ldd` against the binary in CI run 28186328355; full output in
+   `artefact-28186328355/`):
+   - **OpenSSL 1.0** — `libssl.so.1.0.0`, `libcrypto.so.1.0.0`
+     (Debian 8/9 only; OpenSSL 1.1/3.0 are not ABI-compatible)
+   - **curl** — `libcurl.so.4` (works on Debian 8–12)
+   - **FFmpeg 3.x** — `libavformat.so.57`, `libavcodec.so.57`,
+     `libavutil.so.55`, `libswresample.so.2` (Debian 9 only; not
+     available in Debian 10+ repos at all)
+   - **FLAC** — `libFLAC.so.8`, `libFLAC++.so.6` (Debian 9 only;
+     Debian 11+ ships `.12`)
+   - **Audio/mDNS** — `libportaudio.so.2`, `libasound.so.2`,
+     `libavahi-client.so.3`, `libavahi-common.so.3` (compatible across
+     Debian 8–12)
+   - **glibc** version compatible with the binary's expectations
+     (Debian 9's 2.24 works; newer versions need verification).
 4. **Avahi + dbus must be running before the binary starts.** mDNS / Bonjour
    discovery is how the TIDAL app finds the endpoint.
 5. **`network_mode: host` cannot be removed** from `docker-compose.yml`

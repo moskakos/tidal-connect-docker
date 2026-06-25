@@ -1,2 +1,8 @@
 Docker/.env
 *.tar
+
+# Locally downloaded GitHub Actions logs / artifacts (kept for reference,
+# never committed). See AGENTS.md §2 — the ldd output under here is the
+# ground truth for the binary's library requirements.
+artefact-*/
+artifacts/

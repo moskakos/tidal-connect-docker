@@ -29,6 +29,12 @@ jobs:
           dockerfile: tidal-connect/Dockerfile
           failure-threshold: error
 
+      - name: Hadolint (forwarder-arecord/Dockerfile)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: forwarder-arecord/Dockerfile
+          failure-threshold: error
+
       - name: ShellCheck
         uses: ludeeus/action-shellcheck@master
         env:
