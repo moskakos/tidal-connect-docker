@@ -26,11 +26,30 @@ Linux. It contains:
   licenses; keep verbatim.
 - **Do not delete `tidal-connect/src/id_certificate/`** without an explicit
   user request. Required by the binary at runtime.
-- **Library pins are intentional**: the binary requires `libssl.so.1.0.0` and
-  `libcurl.so.4` from Debian 8/9. Any base-image change must continue to
-  satisfy these via snapshot.debian.org packages or equivalent.
+- **Library pins are intentional.** Verified by `ldd` against
+  `tidal_connect_application` in CI (run 28186328355, both `linux/arm/v7`
+  and `linux/arm64` jobs; arm64 host runs the binary under armhf emulation
+  because no aarch64 build exists). The binary loads these SONAMEs from
+  Debian 9 packages — any base-image change must keep them satisfied:
+  - **OpenSSL 1.0:** `libssl.so.1.0.0`, `libcrypto.so.1.0.0`
+    (Debian 8/9 only; Debian 10+ ships 1.1, Debian 12 ships 3.0 — neither
+    is binary-compatible)
+  - **curl:** `libcurl.so.4` (compatible across Debian 8–12)
+  - **FFmpeg 3.x:** `libavformat.so.57`, `libavcodec.so.57`,
+    `libavutil.so.55`, `libswresample.so.2` (Debian 9 only; Debian 10
+    ships FFmpeg 4 → `.58` SONAMEs, **not in Debian 10+ repos at all**)
+  - **FLAC:** `libFLAC.so.8`, `libFLAC++.so.6` (Debian 9 only; Debian 11+
+    ships `.12`)
+  - **Audio/mDNS:** `libportaudio.so.2`, `libasound.so.2`,
+    `libavahi-client.so.3`, `libavahi-common.so.3` (compatible across
+    Debian 8–12)
+  Practical implication: moving past Debian 9 requires either shipping
+  Debian-9 .deb files for FFmpeg 3 and FLAC 8 inside a newer base, or
+  proving the binary tolerates newer SONAMEs (unlikely without source).
 - **`network_mode: host` is required** in `docker-compose.yml` for mDNS /
-  Avahi discovery by the TIDAL app. Removing it breaks discoverability.
+  Avahi discovery by the TIDAL app. The binary links against
+  `libavahi-client.so.3` (verified by `ldd`); removing host networking
+  breaks discoverability.
 - **The TIDAL Connect protocol has no FOSS replacement.** Do not propose
   rewriting the binary away.
 
