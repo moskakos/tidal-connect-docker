@@ -59,6 +59,25 @@ entrypoint):
 - All env-var defaults live at the top of the script in one block. Do not
   scatter `${VAR:-default}` throughout the body.
 
+## ALSA buffering knobs
+
+If a forwarder exposes `PERIOD_TIME` / `BUFFER_TIME` (or analogous
+`PERIOD_SIZE` / `BUFFER_SIZE`) env vars, the two values **must be edited
+in sync**:
+
+- `BUFFER_TIME` must be a small integer multiple of `PERIOD_TIME`
+  (typically 2..8). ALSA silently rounds otherwise.
+- Smaller period = lower latency, more wake-ups, higher CPU. The default
+  policy here is **low CPU first** — keep periods at ALSA's auto-chosen
+  values (currently 125 ms / 500 ms for snd-aloop) unless there is a
+  measured reason to shrink them.
+- Whenever you change defaults in the entrypoint, update the matching
+  env-var rows in `docker-compose.yml` with the same numbers and an
+  inline comment explaining the trade-off.
+- The effective values can be read live from
+  `/proc/asound/<card>/pcm*c/sub*/hw_params` while the forwarder is
+  running — verify after every change.
+
 ## Snapserver JSON-RPC
 
 Endpoint: `http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc`

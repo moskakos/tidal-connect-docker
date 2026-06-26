@@ -67,11 +67,29 @@ STREAM_NAME=${STREAM_NAME:-Tidal}
 AUDIO_DEVICE=${AUDIO_DEVICE:-plughw:Loopback,0}
 SAMPLE_RATE=${SAMPLE_RATE:-44100}
 CHANNELS=${CHANNELS:-2}
+# ALSA capture buffering, in microseconds. Defaults reproduce what
+# snd-aloop picked automatically before these knobs existed (period
+# 125 ms, buffer 500 ms = 4 periods), which keeps idle CPU low.
+#
+# IMPORTANT — keep BUFFER_TIME a small integer multiple of PERIOD_TIME
+# (typically 2..8). ALSA will round otherwise, and the actual numbers
+# may differ from what you set. The forwarder logs both the requested
+# and (via /proc/asound) the effective values; verify after changing.
+#
+# Trade-offs:
+#   smaller PERIOD_TIME -> lower capture-side latency, more wake-ups
+#                          per second, slightly higher CPU
+#   larger  PERIOD_TIME -> fewer wake-ups, more dropout margin, lower CPU
+# Snapcast itself buffers ~1000 ms downstream, so total end-to-end
+# latency is dominated by that, not by these values.
+PERIOD_TIME=${PERIOD_TIME:-125000}
+BUFFER_TIME=${BUFFER_TIME:-500000}
 
 info "Starting arecord audio forwarder for Snapserver"
 info "Snapserver API: $SNAPSERVER_HOST:$SNAPSERVER_API_PORT"
 info "Stream: $STREAM_NAME on port $STREAM_PORT"
 info "Audio device: $AUDIO_DEVICE ($SAMPLE_RATE Hz, $CHANNELS channels)"
+info "ALSA buffering: period_time=${PERIOD_TIME} us, buffer_time=${BUFFER_TIME} us"
 info "ALSA devices:"
 aplay -l || warning "No ALSA devices found or aplay not available"
 
@@ -88,7 +106,8 @@ fi
 
 # Start audio forwarding (as background process)
 info "Starting audio forwarding with arecord + socat"
-arecord -D "$AUDIO_DEVICE" -f S16_LE -r "$SAMPLE_RATE" -c "$CHANNELS" -t raw 2>&1 | \
+arecord -D "$AUDIO_DEVICE" -f S16_LE -r "$SAMPLE_RATE" -c "$CHANNELS" \
+  --period-time="$PERIOD_TIME" --buffer-time="$BUFFER_TIME" -t raw 2>&1 | \
   socat - "TCP:${SNAPSERVER_HOST}:${STREAM_PORT}" &
 
 # Save pipeline PID so we can terminate it properly

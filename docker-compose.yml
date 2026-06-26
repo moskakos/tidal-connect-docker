@@ -78,6 +78,14 @@ services:
       - AUDIO_DEVICE=plughw:Loopback,0
       - SAMPLE_RATE=44100
       - CHANNELS=2
+      # ALSA capture buffering (microseconds). Defaults reproduce the
+      # snd-aloop autopicked values (125 ms period, 500 ms buffer = 4
+      # periods) and keep idle CPU low. To tune, edit the two values
+      # below in sync — BUFFER_TIME must be a small integer multiple
+      # of PERIOD_TIME (typically 2..8); ALSA rounds otherwise. The
+      # forwarder logs the requested values on startup.
+      - PERIOD_TIME=125000   # 125 ms period
+      - BUFFER_TIME=500000   # 500 ms buffer (4 periods)
     volumes:
       - /dev/shm:/dev/shm
       - /etc/timezone:/etc/timezone:ro
