@@ -43,15 +43,15 @@ idle efficiency for playback overhead.
 
 | Date (UTC) | Host description | Forwarder | Idle CPU min/mean/max % | Notes |
 |------------|------------------|-----------|-------------------------|-------|
-| 2026-06-26 | `tidal-dev` Proxmox VM, Debian 13 trixie, kernel 6.12.94, **aarch64 native** (no emulation), 2 vCPU, Docker 29.6.1, Compose v5.2.0 | `ffmpeg` (linuxserver/ffmpeg:latest, PCM `pcm_s16le` 44.1 kHz stereo) | **18.58 / 21.57 / 24.53** | TIDAL app not connected; pipeline running on empty ALSA loopback. 60 s sample, 5 s interval. |
+| 2026-06-26 | `tidal-dev` Proxmox VM, Debian 13 trixie, kernel 6.12.94, **aarch64 emulated on x86 host** (QEMU full-system, no KVM), 2 vCPU, Docker 29.6.1, Compose v5.2.0 | `ffmpeg` (linuxserver/ffmpeg:latest, PCM `pcm_s16le` 44.1 kHz stereo) | **18.58 / 21.57 / 24.53** | TIDAL app not connected; pipeline running on empty ALSA loopback. 60 s sample, 5 s interval. |
 | 2026-06-26 | same as above | `arecord` prototype (alpine:3.20 + alsa-utils + socat, PCM) | **1.22 / 1.43 / 1.81** | Same conditions. Forwarder registered stream with Snapserver (JSON-RPC OK) and started forwarding. |
 
-**Observation:** On this aarch64-native VM, the `arecord` forwarder consumes
-**~15× less idle CPU** than the `ffmpeg` forwarder (mean 1.43 % vs. 21.57 %).
-The original user-reported ~33 % figure was on an x86 host running the VM under
-ARM emulation; this VM is native aarch64, so absolute numbers are not directly
-comparable, but the *ratio* between the two forwarders should hold on the
-emulated host as well.
+**Observation:** On the same x86-hosted, ARM-emulated Proxmox VM that
+previously showed ~33 % idle CPU with `ffmpeg`, the `arecord` forwarder
+consumes **~15× less idle CPU** (mean 1.43 % vs. 21.57 %). The lower
+ffmpeg number compared to the historical ~33 % reference is likely due to
+Debian 13 / kernel 6.12 / Docker 29 updates on the host stack; the
+**ratio** between the two forwarders is the meaningful signal.
 
 **Caveats:**
 
