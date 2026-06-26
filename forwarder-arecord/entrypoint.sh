@@ -93,16 +93,48 @@ info "ALSA buffering: period_time=${PERIOD_TIME} us, buffer_time=${BUFFER_TIME} 
 info "ALSA devices:"
 aplay -l || warning "No ALSA devices found or aplay not available"
 
-# Register stream to snapserver
-info "Registering stream with Snapserver"
-curl -s -X POST "http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc" \
-  -H 'Content-Type: application/json' \
-  -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&codec=pcm&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}"
+# Register stream to snapserver.
+#
+# Snapserver creates a TCP listen socket on $STREAM_PORT as part of
+# AddStream. If a previous container has just exited, that port may
+# still be in TIME_WAIT for ~60 s, in which case AddStream returns
+# {"error":{...,"data":"bind: Address already in use ..."}}. We
+# proactively call RemoveStream first (idempotent — succeeds whether
+# or not a stale stream exists) and then retry AddStream with backoff.
+add_stream() {
+  local response
+  response=$(curl -s -X POST "http://${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}/jsonrpc" \
+    -H 'Content-Type: application/json' \
+    -d "{\"id\":1, \"jsonrpc\":\"2.0\", \"method\":\"Stream.AddStream\", \"params\":{\"streamUri\":\"tcp://0.0.0.0:${STREAM_PORT}?name=${STREAM_NAME}&codec=pcm&sampleformat=${SAMPLE_RATE}:16:${CHANNELS}\"}}")
+  if [ $? -ne 0 ]; then
+    warning "AddStream HTTP call failed (Snapserver unreachable at ${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}?)"
+    return 1
+  fi
+  if echo "$response" | grep -q '"error"'; then
+    warning "AddStream JSON-RPC error: $response"
+    return 1
+  fi
+  info "Stream registered: $response"
+  return 0
+}
 
-if [ $? -ne 0 ]; then
-  warning "Failed to register stream with Snapserver. Continuing anyway..."
-  warning "Check that Snapserver is running on ${SNAPSERVER_HOST}:${SNAPSERVER_API_PORT}"
-fi
+# Clear any stale stream from a previous run before adding our own.
+info "Pre-clearing any stale '$STREAM_NAME' stream"
+remove_stream
+
+info "Registering stream with Snapserver"
+attempt=0
+max_attempts=6
+until add_stream; do
+  attempt=$((attempt + 1))
+  if [ $attempt -ge $max_attempts ]; then
+    error "Failed to register stream after $attempt attempts. Snapserver may still be holding TCP port $STREAM_PORT in TIME_WAIT; try again in a minute, or pick a different STREAM_PORT."
+  fi
+  sleep_for=$((2 ** attempt))
+  [ $sleep_for -gt 30 ] && sleep_for=30
+  warning "Retrying AddStream in ${sleep_for}s (attempt $((attempt + 1))/$max_attempts)..."
+  sleep $sleep_for
+done
 
 # Start audio forwarding (as background process)
 info "Starting audio forwarding with arecord + socat"
