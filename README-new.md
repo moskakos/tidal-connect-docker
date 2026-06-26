@@ -15,7 +15,7 @@ Tidal Connect container
    │
    │  (audio output via ALSA loopback device)
    ▼
-FFmpeg container (or arecord alternative)
+FFmpeg container
    │
    │  (audio stream via TCP)
    ▼
@@ -28,7 +28,7 @@ Snapclient(s)
 
 - The TIDAL app connects to the Tidal Connect container on your network.
 - Tidal Connect outputs audio to an ALSA loopback device.
-- The FFmpeg container creates a new stream via Snapcast API, reads audio from the loopback device and forwards it over TCP. An alternative minimal `arecord`-based forwarder is available for lower CPU usage (see "Choosing a forwarder" below).
+- The FFmpeg container creates a new stream via Snapcast API, reads audio from the loopback device and forwards it over TCP.
 - Snapserver receives the stream and distributes synchronized audio to all Snapclients.
 
 ## Prerequisites
@@ -75,11 +75,6 @@ Snapclient(s)
    ```sh
    docker-compose up -d
    ```
-   
-   To use the alternative low-CPU `arecord` forwarder instead:
-   ```sh
-   docker compose --profile arecord up -d
-   ```
 
 4. **Check logs:**
    ```sh
@@ -94,62 +89,8 @@ Snapclient(s)
   Ensure Snapserver is running and accessible from the forwarder container.
 - **Other Parameters:**  
   Sample rate, channels, buffer sizes, and more can be set in `docker-compose.yml`.
-
-### ALSA buffering (arecord forwarder)
-
-- `PERIOD_TIME` / `BUFFER_TIME`: when using the `arecord` forwarder these
-  environment variables control ALSA capture buffering (microseconds). The
-  `BUFFER_TIME` value should be a small integer multiple of `PERIOD_TIME`.
-  Example (in `docker-compose.yml`):
-
-  - `PERIOD_TIME=125000`   # 125 ms period
-  - `BUFFER_TIME=500000`   # 500 ms buffer (4 periods)
-
-  See `forwarder-arecord/entrypoint.sh` for details and sensible defaults.
-
-### Entrypoint override
-
-You can override the `tidal-connect` container entrypoint by mounting a
-script at `/0-entrypoint.sh`. If present, the container will execute
-`/0-entrypoint.sh` instead of the bundled `entrypoint.sh` (this is useful
-for advanced customizations). Use the original
-[tidal-connect/entrypoint.sh](tidal-connect/entrypoint.sh) as a base.
-
-### Choosing a forwarder
-
-This project provides two audio forwarder implementations. Selection happens
-via Compose profiles. The repo ships a `.env` file at the root that pins
-`COMPOSE_PROFILES=ffmpeg` so that the historical command `docker compose
-up -d` keeps working unchanged.
-
-#### FFmpeg forwarder (default)
-- **Profile:** `ffmpeg` (selected by the shipped `.env`)
-- **Container:** `tidal-forwarder`
-- **Pros:** More flexible, supports multiple codecs (PCM, FLAC), adjustable buffering and resampling
-- **Cons:** Higher CPU usage, especially at idle (~33% on ARM-emulated systems)
-- **Start command:**
-  ```sh
-  docker compose up -d
-  # or explicitly:
-  docker compose --profile ffmpeg up -d
-  ```
-
-#### arecord forwarder (alternative)
-- **Profile:** `arecord`
-- **Container:** `tidal-forwarder-arecord`
-- **Pros:** Minimal CPU usage (significantly lower at idle), simple pipeline
-- **Cons:** PCM only (no FLAC), no resampling or buffering options
-- **Recommended for:** Low-resource hosts, ARM-emulated VMs, or any environment where idle CPU is a concern
-- **Start command:**
-  ```sh
-  # one-shot:
-  COMPOSE_PROFILES=arecord docker compose up -d
-  # or persistently: edit .env and set COMPOSE_PROFILES=arecord
-  ```
-
-**Note:** Both forwarders use the same `STREAM_NAME` and capture the same
-ALSA loopback device, so only run one at a time to avoid conflicts in
-Snapserver.
+- **Using `0-entrypoint.sh` with tidal-connect docker**  
+  You can map volume `some-script.sh:/0-entrypoint.sh` for `tidal-connect` and it will be run instead of the original [`entrypoint.sh`](tidal-connect/entrypoint.sh). Use the original file as a base for your 
 
 ## Configuration options
 
@@ -194,10 +135,6 @@ Also please note that I have no idea what all the parameters in `/bin/tidal_conn
 - Make sure your user has access to `/dev/snd` and the ALSA loopback module is loaded.
 - Follow container's logs immediatelly after starting with `docker-compose up -d && docker-compose logs -f`.
 - For Snapcast issues, verify the stream registration and Snapserver logs.
-
-See also: [docs/troubleshooting.md](docs/troubleshooting.md) and
-[docs/performance-baseline.md](docs/performance-baseline.md) for additional
-diagnostics and performance tuning guidance.
 
 ## Credits
 

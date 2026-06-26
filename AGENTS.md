@@ -71,8 +71,7 @@ Linux. It contains:
 - New environment variables must have defaults inside the entrypoint and be
   documented in [README.md](README.md)'s configuration table.
 - Do not introduce a new top-level `README*.md` file. Edit
-  [README.md](README.md) in place. The existing `README-new.md` /
-  `README-old.md` will be cleaned up separately.
+  [README.md](README.md) in place.
 
 ### Files and structure
 - New helper code goes under a dedicated subdirectory at repo root (e.g.
