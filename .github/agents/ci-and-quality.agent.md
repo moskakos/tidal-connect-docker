@@ -86,7 +86,25 @@ For every task:
 3. **Run lints locally where possible** before pushing — at minimum
    `shellcheck` on touched scripts and `docker compose config` on the
    composition.
-4. **Verify the resulting GitHub Actions run is green** before claiming
+4. **Verify git state before every commit.** This rule exists because a
+   previous run of this agent silently re-added an untracked file
+   (`README-new.md`) via `git add -A` and shipped a commit whose message
+   said "remove" while the diff said "+147 lines".
+   - Before each `git commit`, run:
+
+     ```bash
+     git status --short
+     git --no-pager diff --cached --stat
+     ```
+
+   - Confirm the staged file list and the diff direction (`+`/`-` line
+     counts, `delete mode`, `create mode`) match what your commit
+     **message** claims. If they disagree, fix one of them before
+     committing.
+   - Prefer **explicit** paths over `git add -A` / `git add .`. If you
+     want to delete a tracked file, use `git rm <path>`; for an
+     untracked file on disk, use `rm <path>` (do not stage it).
+5. **Verify the resulting GitHub Actions run is green** before claiming
    done. The repository uses the GitHub REST API for verification
    because the `gh` CLI is not installed on the user's macOS controller:
 
@@ -104,7 +122,7 @@ For every task:
      | jq -r '.jobs[] | "\(.status)/\(.conclusion // "—")  \(.name)"'
    ```
 
-5. **Document the gap closed** in the commit message (e.g.
+6. **Document the gap closed** in the commit message (e.g.
    `ci: add yamllint step to lint job (AGENTS.md §5)`).
 
 ## Concrete next tasks
