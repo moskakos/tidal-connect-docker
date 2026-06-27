@@ -7,6 +7,8 @@ services:
     #  context: .
     #  dockerfile: Docker/Dockerfile
     restart: always
+    security_opt:
+      - "no-new-privileges:true"
     devices:
       - /dev/snd
     network_mode: host
@@ -30,6 +32,8 @@ services:
     depends_on:
       - tidal-connect
     restart: always
+    security_opt:
+      - "no-new-privileges:true"
     network_mode: host
     devices:
       - /dev/snd
@@ -67,6 +71,8 @@ services:
     depends_on:
       - tidal-connect
     restart: always
+    security_opt:
+      - "no-new-privileges:true"
     network_mode: host
     devices:
       - /dev/snd
