@@ -6,6 +6,19 @@ Intended audience: future maintainers and AI agents resuming this work.
 
 ## Snapserver `bind: Address already in use` after forwarder restart
 
+> **Status (2026-06-27): resolved by upgrading Snapserver.** Reproduced
+> on Snapserver **v0.29.0** (rev `208066e5`); does **not** reproduce on
+> **v0.35.0** (rev `f1237347`). Forcing `docker compose up -d
+> --force-recreate tidal-forwarder-arecord` while a snapclient was
+> actively consuming the `Tidal` stream completed `Stream.AddStream` on
+> the first attempt with no retries needed. The retry/backoff in
+> `forwarder-arecord/entrypoint.sh` (commit `720a7a3`) is kept as a
+> defensive measure for older Snapserver builds and for kernel
+> `TIME_WAIT`, but is no longer expected to trigger in normal operation.
+>
+> The rest of this section is retained as historical reference for the
+> v0.29.0 behaviour.
+
 ### Symptom
 
 After tearing down and recreating the forwarder container (`docker

@@ -149,11 +149,12 @@ surface and conflict easily.
   (16-bit/44.1 kHz), not *Max*.
 - `TC_DISABLE_APP_SEC=false` is documented as not working; do not assume it
   does.
-- Snapserver may refuse `Stream.AddStream` with `bind: Address already in
-  use` after forwarder restart if snapclients held the connection through
-  teardown. Workaround: change `STREAM_PORT` or restart the Snapserver
-  LXC. See [docs/troubleshooting.md](docs/troubleshooting.md) for the
-  hypothesis, diagnostic commands, and reproducer.
+- Snapserver `Stream.AddStream` `bind: Address already in use` after
+  forwarder restart: reproduced on Snapserver v0.29.0, **fixed in
+  v0.35.0** (verified 2026-06-27 with active snapclient). Workarounds
+  (change `STREAM_PORT`, restart Snapserver LXC) and the hypothesis are
+  kept in [docs/troubleshooting.md](docs/troubleshooting.md) as
+  historical reference for older Snapserver builds.
 
 ## 9. When in doubt
 
