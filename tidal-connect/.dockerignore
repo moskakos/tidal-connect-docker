@@ -1,0 +1,20 @@
+# Files in this build context that the Dockerfile does NOT consume.
+# Keeps build context small and avoids accidental inclusion of unrelated
+# tooling or systemd integration that does not belong inside the image.
+
+# Helper for manual host-side builds; not used by Dockerfile.
+build_docker.sh
+
+# Host-side systemd unit; not relevant inside a container.
+src/ifi-streamer-tidal-connect.service
+
+# Editor / OS noise (defensive — none currently committed).
+.DS_Store
+*.swp
+*~
+
+# VCS metadata (would not normally appear in a subdir context, but be
+# defensive in case of nested checkouts).
+.git
+.gitignore
+.gitattributes
