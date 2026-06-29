@@ -47,6 +47,11 @@ jobs:
       - name: docker compose config
         run: docker compose -f docker-compose.yml config --quiet
 
+      - name: yamllint
+        run: |
+          python3 -m pip install --quiet 'yamllint==1.37.1'
+          yamllint .
+
   build-and-ldd:
     name: Build & ldd (${{ matrix.arch }})
     needs: lint
