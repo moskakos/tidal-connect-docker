@@ -107,3 +107,156 @@ jobs:
           name: ldd-${{ matrix.arch }}
           path: artifacts/
           retention-days: 14
+
+  smoke-arecord:
+    # Synthetic E2E for the arecord forwarder (AGENTS.md §5 Tier 3):
+    # build the image native, load snd-aloop on the runner, point a
+    # mock Snapserver at TCP 1780 / 5000, and let the real entrypoint
+    # negotiate JSON-RPC AddStream and stream audio bytes for 30 s.
+    name: Smoke test (forwarder-arecord)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build forwarder-arecord (linux/amd64)
+        uses: docker/build-push-action@v5
+        with:
+          context: forwarder-arecord
+          file: forwarder-arecord/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: tidal-forwarder-arecord:ci
+          cache-from: type=gha,scope=forwarder-arecord-amd64
+          cache-to: type=gha,scope=forwarder-arecord-amd64,mode=max
+
+      - name: Install ALSA + load snd-aloop
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            alsa-utils \
+            "linux-modules-extra-$(uname -r)"
+          sudo modprobe snd-aloop
+          # The Loopback card and at least one capture device must show
+          # up before we proceed.
+          ls -l /dev/snd
+          arecord -l | tee /tmp/arecord-l.txt
+          grep -q "Loopback" /tmp/arecord-l.txt
+
+      - name: Start mock Snapserver
+        run: |
+          set -euo pipefail
+          mkdir -p smoke-out
+          nohup python3 tests/smoke/mock-snapserver.py smoke-out \
+            > smoke-out/mock.log 2>&1 &
+          echo $! > smoke-out/mock.pid
+          # Wait for both listeners to come up (5 s max).
+          for _ in $(seq 1 10); do
+            if ss -ltn | grep -q ':1780 ' && ss -ltn | grep -q ':5000 '; then
+              echo "mock Snapserver listening on 1780 and 5000"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "::error::Mock Snapserver did not start in time"
+          cat smoke-out/mock.log || true
+          exit 1
+
+      - name: Start audio source (aplay /dev/urandom -> Loopback,1)
+        run: |
+          set -euo pipefail
+          # Loopback,1 is the playback side; whatever is written here
+          # is what arecord on Loopback,0 inside the container reads.
+          nohup aplay -D plughw:Loopback,1,0 -f S16_LE -r 44100 -c 2 -t raw \
+            < /dev/urandom \
+            > smoke-out/aplay.log 2>&1 &
+          echo $! > smoke-out/aplay.pid
+          sleep 2
+          if ! kill -0 "$(cat smoke-out/aplay.pid)" 2>/dev/null; then
+            echo "::error::aplay failed to start"
+            cat smoke-out/aplay.log || true
+            exit 1
+          fi
+          echo "aplay PID $(cat smoke-out/aplay.pid) running"
+
+      - name: Run forwarder container (with production hardening)
+        run: |
+          set -euo pipefail
+          # Mirror the docker-compose.yml hardening so the smoke test
+          # catches regressions in cap_drop / read_only / tmpfs.
+          docker run -d --name forwarder-smoke \
+            --network host \
+            --device /dev/snd \
+            --security-opt no-new-privileges:true \
+            --cap-drop ALL \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
+            -e SNAPSERVER_HOST=localhost \
+            -e SNAPSERVER_API_PORT=1780 \
+            -e STREAM_PORT=5000 \
+            -e STREAM_NAME=Tidal \
+            -e AUDIO_DEVICE=plughw:Loopback,0 \
+            tidal-forwarder-arecord:ci
+          # 30 s of forwarding -> ~5 MB at 44.1 kHz/S16_LE/stereo,
+          # plenty of margin over the 100 kB threshold below.
+          sleep 30
+          docker ps --filter name=forwarder-smoke
+          docker logs forwarder-smoke
+
+      - name: Verify smoke criteria
+        run: |
+          set -euo pipefail
+          status=$(docker inspect -f '{{.State.Status}}' forwarder-smoke)
+          if [ "$status" != "running" ]; then
+            echo "::error::Container is '$status', expected 'running'"
+            exit 1
+          fi
+          echo "container status: $status (ok)"
+
+          if ! grep -q 'Stream.AddStream' smoke-out/rpc.log; then
+            echo "::error::Stream.AddStream JSON-RPC not received by mock"
+            cat smoke-out/rpc.log || true
+            exit 1
+          fi
+          echo "Stream.AddStream JSON-RPC received (ok)"
+
+          last=$(tail -n 1 smoke-out/bytes.log 2>/dev/null || echo 0)
+          # 30 s * 44100 Hz * 2 ch * 2 B = 5 292 000 B. Require >= 100 kB
+          # to allow for startup delay and an occasional dropped second.
+          if [ "${last:-0}" -lt 100000 ]; then
+            echo "::error::Audio byte count too low: ${last:-0}"
+            tail -n 5 smoke-out/bytes.log 2>/dev/null || true
+            exit 1
+          fi
+          echo "audio bytes received: $last (ok)"
+
+      - name: Collect container logs
+        if: always()
+        run: |
+          docker logs forwarder-smoke > smoke-out/container.log 2>&1 || true
+          ls -la smoke-out/ || true
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-arecord
+          path: smoke-out/
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker rm -f forwarder-smoke 2>/dev/null || true
+          if [ -f smoke-out/aplay.pid ]; then
+            kill "$(cat smoke-out/aplay.pid)" 2>/dev/null || true
+          fi
+          if [ -f smoke-out/mock.pid ]; then
+            kill "$(cat smoke-out/mock.pid)" 2>/dev/null || true
+          fi
