@@ -138,14 +138,47 @@ jobs:
       - name: Install ALSA + load snd-aloop
         run: |
           set -euo pipefail
+          echo "=== runner kernel ==="
+          uname -a
+          echo
+          echo "=== apt update + install alsa-utils ==="
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            alsa-utils \
-            "linux-modules-extra-$(uname -r)"
-          sudo modprobe snd-aloop
-          # The Loopback card and at least one capture device must show
-          # up before we proceed.
+          sudo apt-get install -y --no-install-recommends alsa-utils
+          echo
+          echo "=== install kernel extra modules (try several package names) ==="
+          # ubuntu-latest runners use the Azure kernel; the version-specific
+          # package may or may not be in the repos. Try the metapackage,
+          # the version-specific one, then the generic one as fallbacks.
+          installed=""
+          for pkg in \
+              "linux-modules-extra-$(uname -r)" \
+              "linux-modules-extra-azure" \
+              "linux-modules-extra-generic"; do
+            echo "trying: $pkg"
+            if sudo apt-get install -y --no-install-recommends "$pkg" 2>&1 | tail -3; then
+              installed="$pkg"
+              echo "installed: $pkg"
+              break
+            fi
+          done
+          if [ -z "$installed" ]; then
+            echo "::warning::No linux-modules-extra package installed; snd-aloop may still load if built-in"
+          fi
+          echo
+          echo "=== modprobe snd-aloop ==="
+          if ! sudo modprobe snd-aloop; then
+            echo "::error::Failed to load snd-aloop kernel module"
+            echo "--- available snd-aloop modules ---"
+            find /lib/modules -name 'snd-aloop*' 2>&1 | head -5 || true
+            echo "--- apt-cache search ---"
+            apt-cache search linux-modules-extra | head -10 || true
+            exit 1
+          fi
+          echo
+          echo "=== /dev/snd ==="
           ls -l /dev/snd
+          echo
+          echo "=== arecord -l ==="
           arecord -l | tee /tmp/arecord-l.txt
           grep -q "Loopback" /tmp/arecord-l.txt
 
