@@ -76,6 +76,9 @@ services:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
     network_mode: host
     devices:
       - /dev/snd
