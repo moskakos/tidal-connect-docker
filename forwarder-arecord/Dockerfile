@@ -1,4 +1,9 @@
-FROM alpine:3.20
+# Alpine 3.20 manifest list digest (pulled 2026-04-17). Pinning the
+# digest makes the build reproducible across hosts and CI re-runs.
+# To pick up a newer 3.20.x security patch, refresh with:
+#   docker buildx imagetools inspect alpine:3.20
+# and update the @sha256:... below.
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
 
 # Install required packages
 RUN apk add --no-cache \
