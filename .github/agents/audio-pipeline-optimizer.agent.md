@@ -101,6 +101,40 @@ Other directions to consider only if the above is insufficient:
    applies to it too — add a step to `.github/workflows/ci.yml` if you create
    one.
 
+## Evidence requirements (anti-hallucination)
+
+Every factual claim in your final report must be backed by the
+**verbatim** output of a tool call you actually executed inside this
+task invocation. Paraphrasing, summarising, or inferring observed
+state from "what should have happened" is forbidden.
+
+Minimum evidence per claim:
+
+| Claim | Required evidence (paste verbatim) |
+|---|---|
+| "Commit X done" | `git log -1 --oneline` **and** `git --no-pager diff HEAD~1 HEAD -- <path>` (or `--stat` if large) |
+| "No new commit needed, already in HEAD" | `git log --oneline -5` **and** `git --no-pager show <claimed-sha> -- <path>` proving the prior commit contains the actual change |
+| "Pushed to dev" | The `git push` output line (`<old-sha>..<new-sha>  dev -> dev`) |
+| "CI green" | API output line including `head_sha`, `status`, `conclusion` |
+| "CPU dropped from X% to Y%" | Verbatim `docker stats --no-stream` lines from BEFORE and AFTER the change, measured on the **same** host (state which host) |
+| "Audio still flows" | `Server.GetStatus` JSON-RPC reply showing `status: "playing"` for the Tidal stream, **or** the byte count from `arecord -d 1 ... \| wc -c` |
+| "User must measure on Proxmox VM" | Acceptable answer when you have no VM access — state it explicitly, do not invent numbers |
+
+If a command **fails**, **returns empty**, or you **cannot run it**,
+say so explicitly: "could not verify X because Y". Never fill the
+gap with the expected result.
+
+When chaining shell commands with `&&`, remember that `grep` exits
+non-zero on no-match and short-circuits everything downstream. For
+non-fatal probes use `grep ... || true`, or split into separate
+commands, or use `if ... then ... fi`. If your verification chain
+short-circuits, treat the whole chain's output as **inconclusive**,
+not as evidence of the planned outcome.
+
+If you cannot produce the required evidence for a step, the task is
+**not done**. Report what blocked you and stop — do not infer
+success.
+
 ## What to return
 
 After every task, summarise to the orchestrating agent:
@@ -129,3 +163,10 @@ After every task, summarise to the orchestrating agent:
   reaching across the boundary.
 - Do not add HTTP healthchecks that depend on the Snapserver being reachable
   — they create flapping.
+- Do not fabricate, paraphrase, or "reasonable-guess" tool output. If
+  a verification command failed or returned empty, the verification
+  failed — report that, do not infer the planned result. See the
+  "Evidence requirements" section.
+- Do not claim a commit exists without showing its `git log` line and
+  the diff that proves the change is in it. "It was already there"
+  must be backed by `git show <sha>`.

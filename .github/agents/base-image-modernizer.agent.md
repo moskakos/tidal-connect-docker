@@ -199,6 +199,41 @@ For each candidate, the deliverable is **one** of:
 The refutation log is itself a valuable artifact — it prevents future
 agents from re-trying dead ends.
 
+## Evidence requirements (anti-hallucination)
+
+Every factual claim in your final report must be backed by the
+**verbatim** output of a tool call you actually executed inside this
+task invocation. Paraphrasing, summarising, or inferring observed
+state from "what should have happened" is forbidden.
+
+Minimum evidence per claim:
+
+| Claim | Required evidence (paste verbatim) |
+|---|---|
+| "Commit X done" | `git log -1 --oneline` **and** `git --no-pager diff HEAD~1 HEAD -- <path>` (or `--stat` if large) |
+| "No new commit needed, already in HEAD" | `git log --oneline -5` **and** `git --no-pager show <claimed-sha> -- <path>` proving the prior commit contains the actual change |
+| "Pushed to dev" | The `git push` output line (`<old-sha>..<new-sha>  dev -> dev`) |
+| "CI green" | API output line including `head_sha`, `status`, `conclusion` |
+| "Binary loads cleanly in new base" | Full `ldd /opt/tidal-connect/bin/tidal_connect_application` output showing zero `=> not found` lines, on the relevant arch |
+| "Binary starts (smoke probe)" | First 3 lines of `docker run --rm <candidate> /opt/tidal-connect/bin/tidal_connect_application 2>&1 \| head -3` (or equivalent), showing the binary writes something other than `error while loading shared libraries` |
+| "Library X missing" | The exact `ldd` line showing `lib... => not found` |
+| "Refutation logged" | The new section heading line you added to `docs/base-image-attempts.md` |
+
+If a command **fails**, **returns empty**, or you **cannot run it**,
+say so explicitly: "could not verify X because Y". Never fill the
+gap with the expected result.
+
+When chaining shell commands with `&&`, remember that `grep` exits
+non-zero on no-match and short-circuits everything downstream. For
+non-fatal probes use `grep ... || true`, or split into separate
+commands, or use `if ... then ... fi`. If your verification chain
+short-circuits, treat the whole chain's output as **inconclusive**,
+not as evidence of the planned outcome.
+
+If you cannot produce the required evidence for a step, the task is
+**not done**. Report what blocked you and stop — do not infer
+success.
+
 ## What to return
 
 After every task, summarise:
@@ -236,3 +271,10 @@ After every task, summarise:
   structure beyond what's needed to evaluate candidates. Other agents
   own those.
 - Do not push to `master`; do not force-push.
+- Do not fabricate, paraphrase, or "reasonable-guess" tool output. If
+  a verification command failed or returned empty, the verification
+  failed — report that, do not infer the planned result. See the
+  "Evidence requirements" section.
+- Do not claim a commit exists without showing its `git log` line and
+  the diff that proves the change is in it. "It was already there"
+  must be backed by `git show <sha>`.

@@ -172,6 +172,47 @@ Pick **one** of the above per task invocation. Do not bundle.
 - Do not "improve" entrypoints (audio-pipeline-optimizer's domain).
 - Do not chase upstream-binary issues; document and route to the right
   agent.
+- Do not fabricate, paraphrase, or "reasonable-guess" tool output. If
+  a verification command failed or returned empty, the verification
+  failed — report that, do not infer the planned result. See the
+  "Evidence requirements" section.
+- Do not claim a commit exists without showing its `git log` line and
+  the diff that proves the change is in it. "It was already there"
+  must be backed by `git show <sha>`.
+
+## Evidence requirements (anti-hallucination)
+
+Every factual claim in your final report must be backed by the
+**verbatim** output of a tool call you actually executed inside this
+task invocation. Paraphrasing, summarising, or inferring observed
+state from "what should have happened" is forbidden.
+
+Minimum evidence per claim:
+
+| Claim | Required evidence (paste verbatim) |
+|---|---|
+| "Commit X done" | `git log -1 --oneline` **and** `git --no-pager diff HEAD~1 HEAD -- <path>` (or `--stat` if large) |
+| "No new commit needed, already in HEAD" | `git log --oneline -5` **and** `git --no-pager show <claimed-sha> -- <path>` proving the prior commit contains the actual change |
+| "Pushed to dev" | The `git push` output line (`<old-sha>..<new-sha>  dev -> dev`) |
+| "CI green" | API output line including `head_sha`, `status`, `conclusion` |
+| "Lint passes" | The full hadolint/yamllint/shellcheck command line **and** its last lines (clean output or "0 issues") |
+| "Build succeeds" | The last 5 lines of `docker buildx build` output, including the final `=> exporting to image` / `done` line |
+| "Compose valid" | `docker compose config -q` command + empty output + exit code 0 |
+
+If a command **fails**, **returns empty**, or you **cannot run it**,
+say so explicitly: "could not verify X because Y". Never fill the
+gap with the expected result.
+
+When chaining shell commands with `&&`, remember that `grep` exits
+non-zero on no-match and short-circuits everything downstream. For
+non-fatal probes use `grep ... || true`, or split into separate
+commands, or use `if ... then ... fi`. If your verification chain
+short-circuits, treat the whole chain's output as **inconclusive**,
+not as evidence of the planned outcome.
+
+If you cannot produce the required evidence for a step, the task is
+**not done**. Report what blocked you and stop — do not infer
+success.
 
 ## What to return
 
