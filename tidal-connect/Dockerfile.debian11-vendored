@@ -84,6 +84,18 @@ RUN cd /tmp/debs && \
     dpkg-deb -x libflac++6v5_1.3.2-2+deb9u2_armhf.deb extract-flac && \
     cp -a extract-flac/usr/lib/arm-linux-gnueabihf/libFLAC*.so.* /opt/legacy-libs/
 
+# Create SONAME symlinks. Debian .debs ship the real SO files (e.g.
+# libssl.so.1.0.2) and rely on the package's postinst -> ldconfig step
+# to create the SONAME alias (libssl.so.1.0.0 -> libssl.so.1.0.2) that
+# the dynamic loader actually looks up. `dpkg-deb -x` bypasses postinst,
+# so we run `ldconfig -n` against /opt/legacy-libs to create those
+# aliases for us. `-n` means: process this dir only, do not touch the
+# system /etc/ld.so.cache (which is fine — LD_LIBRARY_PATH scans dirs
+# directly without the cache).
+RUN ldconfig -n /opt/legacy-libs && \
+    echo "--- /opt/legacy-libs after ldconfig ---" && \
+    ls -la /opt/legacy-libs/
+
 # Cleanup
 RUN rm -rf /tmp/debs
 
