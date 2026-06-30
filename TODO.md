@@ -25,11 +25,11 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-06-30 (BASE-1 in progress on `feat/base-1-debian12-refute`).
+> Last refresh: 2026-06-30 (BASE-1 refuted, 31c7668; only BASE-2 viable).
 
 ## Active
 
-- 🟡 **BASE-1** — Debian 12 + SONAME-symlink refute on branch [`feat/base-1-debian12-refute`](https://github.com/moskakos/tidal-connect-docker/tree/feat/base-1-debian12-refute). Gathering ldd evidence in CI; doc-only commit lands on `dev` once refute is concrete.
+_(no active task — pick a `P1` row below and flip its Status to 🟡)_
 
 ## ci-and-quality
 
@@ -60,7 +60,7 @@
 
 | Status | Pri | ID     | Description                                                                                                                            | Commit |
 |--------|-----|--------|----------------------------------------------------------------------------------------------------------------------------------------|--------|
-| 🟡     | P3  | BASE-1 | Approach (c) quick refute: Debian 12 + SONAME symlinks; document negative result in [docs/troubleshooting.md](docs/troubleshooting.md) | —      |
+| ✅     | P3  | BASE-1 | Approach (c) quick refute: Debian 12 + SONAME symlinks; document negative result in [docs/troubleshooting.md](docs/troubleshooting.md) | 31c7668 |
 | 🔴     | P3  | BASE-2 | Approach (a): Debian 11 + vendored Debian-9 `.deb`s (OpenSSL 1.0, FFmpeg 3, FLAC 8) under `/opt/legacy-libs`; both arches              | —      |
 
 ## audio-pipeline-optimizer
