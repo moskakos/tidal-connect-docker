@@ -8,10 +8,16 @@
 # LIBAV*_5{5,7}, etc. SONAME symlinks to newer libs fail (BASE-1 refuted
 # in CI run 28461155940). This approach ships the actual Debian-9 .so files.
 #
+# Platform pin: the vendor binary is armhf-only (AGENTS.md §2). We FORCE the
+# base to linux/arm/v7 so the image content is always armhf; the arm64 CI
+# matrix entry then verifies the same armhf image is loadable under arm64
+# host QEMU emulation — mirroring how the production raspbian/stretch image
+# behaves (raspbian has no arm64 variant on Docker Hub).
+#
 # License review: All vendored packages are redistributable (see note below).
-# Snapshot timestamp: 20200630T000000Z (Debian 9 near EOL, stable archive).
+# Snapshot URLs resolved 2026-06-30 via snapshot.debian.org metadata API.
 
-FROM debian:11-slim
+FROM --platform=linux/arm/v7 debian:11-slim
 
 # Install stable packages from Debian 11 (compatible across Debian 8-12)
 RUN apt-get update -y -q && \
@@ -33,12 +39,12 @@ RUN apt-get update -y -q && \
 # conflicts with Debian-11 native packages (e.g. libssl3 vs libssl1.0.0).
 RUN mkdir -p /tmp/debs /opt/legacy-libs
 
-# OpenSSL 1.0.2 (Debian 9 stretch)
+# OpenSSL 1.0.2 (Debian 9 stretch, source pkg `openssl1.0`)
 # License: OpenSSL License (BSD-style, redistributable with notice)
 # SONAME: libssl.so.1.0.0, libcrypto.so.1.0.0
 # Symbol versions: OPENSSL_1.0.0, OPENSSL_1.0.1 (not present in OpenSSL 1.1/3.0)
 RUN cd /tmp/debs && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/o/openssl/libssl1.0.2_1.0.2u-1~deb9u7_armhf.deb && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220317T102333Z/pool/updates/main/o/openssl1.0/libssl1.0.2_1.0.2u-1~deb9u7_armhf.deb' && \
     dpkg-deb -x libssl1.0.2_1.0.2u-1~deb9u7_armhf.deb extract && \
     cp -a extract/usr/lib/arm-linux-gnueabihf/libssl.so.1.0.* /opt/legacy-libs/ && \
     cp -a extract/usr/lib/arm-linux-gnueabihf/libcrypto.so.1.0.* /opt/legacy-libs/
@@ -48,8 +54,8 @@ RUN cd /tmp/debs && \
 # SONAME: libcurl.so.4 (stable across Debian 8-12)
 # Symbol version: CURL_OPENSSL_3 (only in libcurl linked against OpenSSL 1.0)
 RUN cd /tmp/debs && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/c/curl/libcurl3_7.52.1-5+deb9u13_armhf.deb && \
-    dpkg-deb -x libcurl3_7.52.1-5+deb9u13_armhf.deb extract-curl && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20210930T235452Z/pool/updates/main/c/curl/libcurl3_7.52.1-5+deb9u16_armhf.deb' && \
+    dpkg-deb -x libcurl3_7.52.1-5+deb9u16_armhf.deb extract-curl && \
     cp -a extract-curl/usr/lib/arm-linux-gnueabihf/libcurl.so.4* /opt/legacy-libs/
 
 # FFmpeg 3.x (Debian 9 stretch)
@@ -57,14 +63,14 @@ RUN cd /tmp/debs && \
 # SONAMEs: libavformat.so.57, libavcodec.so.57, libavutil.so.55, libswresample.so.2
 # Symbol versions: LIBAVFORMAT_57, LIBAVCODEC_57, LIBAVUTIL_55, LIBSWRESAMPLE_2
 RUN cd /tmp/debs && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libavformat57_3.2.15-0+deb9u3_armhf.deb && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libavcodec57_3.2.15-0+deb9u3_armhf.deb && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libavutil55_3.2.15-0+deb9u3_armhf.deb && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libswresample2_3.2.15-0+deb9u3_armhf.deb && \
-    dpkg-deb -x libavformat57_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
-    dpkg-deb -x libavcodec57_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
-    dpkg-deb -x libavutil55_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
-    dpkg-deb -x libswresample2_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220516T122324Z/pool/updates/main/f/ffmpeg/libavformat57_3.2.18-0+deb9u1_armhf.deb' && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220516T122324Z/pool/updates/main/f/ffmpeg/libavcodec57_3.2.18-0+deb9u1_armhf.deb' && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220516T122324Z/pool/updates/main/f/ffmpeg/libavutil55_3.2.18-0+deb9u1_armhf.deb' && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220516T122324Z/pool/updates/main/f/ffmpeg/libswresample2_3.2.18-0+deb9u1_armhf.deb' && \
+    dpkg-deb -x libavformat57_3.2.18-0+deb9u1_armhf.deb extract-ffmpeg && \
+    dpkg-deb -x libavcodec57_3.2.18-0+deb9u1_armhf.deb extract-ffmpeg && \
+    dpkg-deb -x libavutil55_3.2.18-0+deb9u1_armhf.deb extract-ffmpeg && \
+    dpkg-deb -x libswresample2_3.2.18-0+deb9u1_armhf.deb extract-ffmpeg && \
     cp -a extract-ffmpeg/usr/lib/arm-linux-gnueabihf/libav*.so.* /opt/legacy-libs/ && \
     cp -a extract-ffmpeg/usr/lib/arm-linux-gnueabihf/libswresample.so.* /opt/legacy-libs/
 
@@ -72,10 +78,10 @@ RUN cd /tmp/debs && \
 # License: BSD-style (Xiph.Org license, redistributable)
 # SONAMEs: libFLAC.so.8, libFLAC++.so.6
 RUN cd /tmp/debs && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/flac/libflac8_1.3.2-1_armhf.deb && \
-    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/flac/libflac++6v5_1.3.2-1_armhf.deb && \
-    dpkg-deb -x libflac8_1.3.2-1_armhf.deb extract-flac && \
-    dpkg-deb -x libflac++6v5_1.3.2-1_armhf.deb extract-flac && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220316T212350Z/pool/updates/main/f/flac/libflac8_1.3.2-2+deb9u2_armhf.deb' && \
+    curl -fsSL -O 'https://snapshot.debian.org/archive/debian-security/20220316T212350Z/pool/updates/main/f/flac/libflac++6v5_1.3.2-2+deb9u2_armhf.deb' && \
+    dpkg-deb -x libflac8_1.3.2-2+deb9u2_armhf.deb extract-flac && \
+    dpkg-deb -x libflac++6v5_1.3.2-2+deb9u2_armhf.deb extract-flac && \
     cp -a extract-flac/usr/lib/arm-linux-gnueabihf/libFLAC*.so.* /opt/legacy-libs/
 
 # Cleanup
