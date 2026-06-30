@@ -25,11 +25,11 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-06-30 (SEC-7 done 7586ff7; SEC-6 in progress).
+> Last refresh: 2026-06-30 (SEC-6 done, 127099a).
 
 ## Active
 
-🟡 **SEC-6** — Document security posture (README section or `docs/security.md`)
+_(no active task — pick a `P1` row below and flip its Status to 🟡)_
 
 ## ci-and-quality
 
@@ -53,7 +53,7 @@
 | ✅     |     | SEC-3 | `forwarder-arecord` runs as non-root (uid 1001, gid 29)                 | 9ec8caa               |
 | ✅     |     | SEC-4 | Pin third-party images by digest                                        | 4e6b8ed (shared CI-4) |
 | ✅     |     | SEC-5 | `forwarder-arecord` read-only rootfs + tmpfs `/tmp`                     | b6ffed6               |
-| 🟡     | P2  | SEC-6 | Document security posture (README section or `docs/security.md`)        | —                     |
+| ✅     |     | SEC-6 | Document security posture ([docs/security.md](docs/security.md))        | 127099a               |
 | ✅     |     | SEC-7 | `.trivyignore` allowlist review (per-block justification in header)     | 7586ff7               |
 
 ## base-image-modernizer
