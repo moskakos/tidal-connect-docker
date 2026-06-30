@@ -111,10 +111,10 @@ jobs:
             -c 'ldd /app/ifi-tidal-release/bin/tidal_connect_application' \
             | tee "$out"
           if grep -E 'not found' "$out" > /dev/null; then
-            echo "::error::Unresolved shared libraries in tidal_connect_application on ${{ matrix.platform }} (candidate: ${{ matrix.candidate || 'production' }})"
+            echo "::error::Unresolved libraries on ${{ matrix.platform }} (${{ matrix.candidate || 'production' }})"
             exit 1
           fi
-          echo "All shared libraries resolved on ${{ matrix.platform }} (candidate: ${{ matrix.candidate || 'production' }})"
+          echo "All libraries resolved on ${{ matrix.platform }} (${{ matrix.candidate || 'production' }})"
 
       - name: Runtime smoke probe (BASE-2 candidate)
         if: matrix.candidate == 'debian11-vendored'
@@ -134,21 +134,21 @@ jobs:
                   -f "CI Smoke Test" \
                   --model-name "CI" 2>&1 || echo "exit_code=$?"' \
             | tee "$out"
-          
+
           # Check for library load failures (exit 127 or "error while loading")
           if grep -qE '(error while loading shared libraries|exit_code=127)' "$out"; then
             echo "::error::Binary failed to load shared libraries on ${{ matrix.platform }}"
             cat "$out"
             exit 1
           fi
-          
+
           # Check for segfault (exit 139 or signal 11)
           if grep -qE '(Segmentation fault|exit_code=139)' "$out"; then
             echo "::error::Binary segfaulted on ${{ matrix.platform }}"
             cat "$out"
             exit 1
           fi
-          
+
           # Timeout (124) or other exit codes are acceptable here — the binary
           # will fail to initialize ALSA without /dev/snd, but we only care that
           # it loaded cleanly.
