@@ -195,9 +195,10 @@ Also please note that I have no idea what all the parameters in `/bin/tidal_conn
 - Follow container's logs immediatelly after starting with `docker-compose up -d && docker-compose logs -f`.
 - For Snapcast issues, verify the stream registration and Snapserver logs.
 
-See also: [docs/troubleshooting.md](docs/troubleshooting.md) and
-[docs/performance-baseline.md](docs/performance-baseline.md) for additional
-diagnostics and performance tuning guidance.
+See also: [docs/troubleshooting.md](docs/troubleshooting.md),
+[docs/performance-baseline.md](docs/performance-baseline.md), and
+[docs/security.md](docs/security.md) for additional diagnostics,
+performance tuning, and the security posture of this stack.
 
 ## Credits
 
