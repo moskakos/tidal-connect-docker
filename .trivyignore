@@ -1,0 +1,22 @@
+# .trivyignore — checked-in allowlist for Trivy image scans.
+#
+# Policy: every entry MUST be preceded by a comment that explains the
+# justification (why the finding is acceptable here). Bare entries are
+# rejected at review time. Prefer fixing over allowlisting whenever a
+# patched package is available.
+#
+# Format: one Trivy ID per line (typically CVE-YYYY-NNNN, but Trivy may
+# also emit GHSA-* / DLA-* / DSA-* IDs). Lines starting with '#' are
+# comments. Blank lines are allowed.
+#
+# Scope of the gate (set in .github/workflows/ci.yml):
+#   severity:        HIGH,CRITICAL
+#   ignore-unfixed:  true     # finding is hidden if no patched version exists
+#   gate:            warn-only initially (CI-6); hard-fail planned in CI-8.
+#
+# This file starts empty on purpose: we want the first Trivy CI run to
+# print the full list of fixable HIGH/CRITICAL findings in the build
+# logs so we can decide each one consciously rather than silencing
+# whole classes up front.
+
+# (no allowlist entries yet)

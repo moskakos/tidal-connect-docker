@@ -100,6 +100,21 @@ jobs:
           fi
           echo "All shared libraries resolved on ${{ matrix.platform }}"
 
+      - name: Trivy scan (tidal-connect:ci-${{ matrix.arch }}) [report-only]
+        # CI-6 (TODO.md): report-only first iteration so we can read the
+        # actual findings from the build log via the GitHub API before
+        # populating .trivyignore. CI-8 will flip exit-code to 1.
+        # ignore-unfixed: hides findings with no patched version (large
+        # share of Debian-9 EOL CVEs); we can only act on fixables.
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: tidal-connect:ci-${{ matrix.arch }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '0'
+
       - name: Upload ldd report
         if: always()
         uses: actions/upload-artifact@v4
@@ -242,6 +257,19 @@ jobs:
             exit 1
           fi
           echo "HEALTHCHECK declared in image (ok)"
+
+      - name: Trivy scan (tidal-forwarder-arecord:ci) [report-only]
+        # CI-6 (TODO.md): same report-only policy as the tidal-connect
+        # scan in build-and-ldd. forwarder-arecord uses an Alpine base
+        # so the finding count should be small.
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: tidal-forwarder-arecord:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '0'
 
       - name: Collect container logs
         if: always()
