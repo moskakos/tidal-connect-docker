@@ -23,6 +23,21 @@ RUN addgroup -g 29 -S audio-host \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Healthcheck: the forwarder is healthy as long as the capture
+# pipeline is running. arecord is the longest-lived process and the
+# one that fails first when /dev/snd, the Loopback PCM, or ALSA
+# permissions break, so its presence is a reliable liveness signal.
+# Uses busybox pgrep (no extra package needed). The probe avoids
+# anything that depends on Snapserver reachability so a momentary
+# Snapserver hiccup does not flap the container.
+#
+# start-period covers the AddStream retry loop in entrypoint.sh
+# (up to ~6 attempts with exponential backoff capped at 30 s, but
+# the warm-cache case lands in ~1-2 s, so 30 s is a comfortable
+# upper bound for normal startup without masking real failures).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD pgrep -x arecord >/dev/null || exit 1
+
 USER forwarder
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -230,6 +230,19 @@ jobs:
           fi
           echo "container exited cleanly via EXIT trap (ok)"
 
+          # 4) Image carries a HEALTHCHECK directive. We cannot observe
+          # the probe's runtime result here (the container exits when
+          # arecord fails without /dev/snd, before Docker's first
+          # probe), but verifying the image-level declaration catches
+          # accidental removal of the HEALTHCHECK line in the Dockerfile.
+          hc=$(docker inspect -f '{{range .Config.Healthcheck.Test}}{{.}} {{end}}' tidal-forwarder-arecord:ci)
+          echo "image HEALTHCHECK: $hc"
+          if ! echo "$hc" | grep -q 'pgrep'; then
+            echo "::error::Image does not declare a pgrep-based HEALTHCHECK"
+            exit 1
+          fi
+          echo "HEALTHCHECK declared in image (ok)"
+
       - name: Collect container logs
         if: always()
         run: |
