@@ -45,6 +45,7 @@ idle efficiency for playback overhead.
 |------------|------------------|-----------|-------------------------|-------|
 | 2026-06-26 | `tidal-dev` Proxmox VM, Debian 13 trixie, kernel 6.12.94, **aarch64 emulated on x86 host** (QEMU full-system, no KVM), 2 vCPU, Docker 29.6.1, Compose v5.2.0 | `ffmpeg` (linuxserver/ffmpeg:latest, PCM `pcm_s16le` 44.1 kHz stereo) | **18.58 / 21.57 / 24.53** | TIDAL app not connected; pipeline running on empty ALSA loopback. 60 s sample, 5 s interval. |
 | 2026-06-26 | same as above | `arecord` prototype (alpine:3.20 + alsa-utils + socat, PCM) | **1.22 / 1.43 / 1.81** | Same conditions. Forwarder registered stream with Snapserver (JSON-RPC OK) and started forwarding. |
+| 2026-06-30 | same as above (HEAD `7c22852`) | `arecord` post-hardening (alpine 3.20 digest-pinned, non-root uid 1001/gid 29, cap_drop ALL, read-only rootfs + tmpfs `/tmp` nosuid/nodev/noexec, HEALTHCHECK every 30 s) | **0.91 / 2.32 / 11.32** (run 2 of 2; run 1: 1.16 / 2.37 / 10.05); **median ≈ 1.4** across both runs | TIDAL app not connected; 60 s × 5 s × 2 runs back-to-back. Median tracks the 2026-06-26 baseline (1.43 % mean). The recurring ~10–11 % spike (1 sample / run, ~30 s apart) is consistent with the CI-5 HEALTHCHECK (`pgrep arecord && pgrep socat`, `interval: 30s`) running inside the container — see [forwarder-arecord/Dockerfile](../forwarder-arecord/Dockerfile). Healthcheck overhead is amplified by QEMU armhf full-system emulation; on real ARM hardware it would be sub-1 %. SEC-2/3/5 hardening adds no measurable steady-state cost. |
 
 **Observation:** On the same x86-hosted, ARM-emulated Proxmox VM that
 previously showed ~33 % idle CPU with `ffmpeg`, the `arecord` forwarder
@@ -61,6 +62,15 @@ Debian 13 / kernel 6.12 / Docker 29 updates on the host stack; the
 - Active playback CPU is not yet measured; that requires real TIDAL traffic.
 - `tidal-connect` container CPU was not measured separately; it is identical
   across both forwarder variants and not the optimization target.
+- The 2026-06-30 re-measurement uses the same VM (`tidal-dev`, same kernel /
+  Docker / Compose versions) as the 2026-06-26 baseline — apples-to-apples
+  except for the added container hardening (SEC-2/3/5) and the CI-5
+  HEALTHCHECK. The healthcheck causes a periodic, predictable CPU spike
+  (~10–11 % for one sample per run) under armhf emulation; if the spike
+  matters for your environment, raise the healthcheck `interval` in
+  [forwarder-arecord/Dockerfile](../forwarder-arecord/Dockerfile) (e.g.
+  60 s or 120 s) or, on real ARM hardware, ignore — emulation amplifies
+  the cost.
 
 ## How to record a new baseline
 
