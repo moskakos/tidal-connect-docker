@@ -79,6 +79,21 @@ Linux. It contains:
 - `.dockerignore` should be respected and kept tight — vendor license trees
   should not bloat container images.
 
+### Backlog tracking
+- [TODO.md](TODO.md) is the consolidated status dashboard for project +
+  agent work. Status legend: 🔴 not started · 🟡 in progress · ✅ done.
+- **Agents do not edit [TODO.md](TODO.md).** They update only their own
+  `.github/agents/<name>.agent.md` "Concrete next tasks" section when
+  proposing or refining work. The assistant ("Jalmari") reconciles those
+  changes into [TODO.md](TODO.md) on user request or after a completed
+  task. This avoids merge conflicts and keeps the dashboard curated.
+- Task rows in [TODO.md](TODO.md) keep their line position once added;
+  only the status emoji, priority marker, and trailing commit SHA change.
+  New tasks are appended to the bottom of their agent section. IDs are
+  not reused.
+- At most **one 🟡** row in [TODO.md](TODO.md) at a time across all
+  agents — that's the focus discipline.
+
 ## 4. Git workflow
 
 - **Base branch for development: `dev`** (not `master`).
