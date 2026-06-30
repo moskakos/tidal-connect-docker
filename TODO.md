@@ -60,7 +60,7 @@
 
 | Status | Pri | ID     | Description                                                                                                                            | Commit |
 |--------|-----|--------|----------------------------------------------------------------------------------------------------------------------------------------|--------|
-| �     | P3  | BASE-1 | Approach (c) quick refute: Debian 12 + SONAME symlinks; document negative result in [docs/troubleshooting.md](docs/troubleshooting.md) | —      |
+| 🟡     | P3  | BASE-1 | Approach (c) quick refute: Debian 12 + SONAME symlinks; document negative result in [docs/troubleshooting.md](docs/troubleshooting.md) | —      |
 | 🔴     | P3  | BASE-2 | Approach (a): Debian 11 + vendored Debian-9 `.deb`s (OpenSSL 1.0, FFmpeg 3, FLAC 8) under `/opt/legacy-libs`; both arches              | —      |
 
 ## audio-pipeline-optimizer
