@@ -25,7 +25,7 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-06-30 (SEC-6 done, 127099a).
+> Last refresh: 2026-06-30 (AUDIO-5 done, 551fe27).
 
 ## Active
 
@@ -71,7 +71,7 @@ _(no active task — pick a `P1` row below and flip its Status to 🟡)_
 | ✅     |     | AUDIO-2 | Idle-CPU baseline doc (aarch64 emulated)                                                                                       | 96f8f45 |
 | ✅     |     | AUDIO-3 | Expose `PERIOD_TIME` / `BUFFER_TIME` env tunables                                                                              | e9ebf47 |
 | ✅     |     | AUDIO-4 | AddStream retry with backoff (Snapserver TIME_WAIT)                                                                            | 720a7a3 |
-| 🔴     | P2  | AUDIO-5 | Re-measure idle CPU after SEC-2 / SEC-3 / SEC-5 hardening; update [docs/performance-baseline.md](docs/performance-baseline.md) | —       |
+| ✅     |     | AUDIO-5 | Re-measure idle CPU after SEC-2 / SEC-3 / SEC-5 hardening; update [docs/performance-baseline.md](docs/performance-baseline.md) | 551fe27 |
 
 ## Cross-cutting
 
