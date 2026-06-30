@@ -53,17 +53,33 @@ jobs:
           yamllint .
 
   build-and-ldd:
-    name: Build & ldd (${{ matrix.arch }})
+    name: Build & ldd (${{ matrix.name }})
     needs: lint
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
+          # Production build (Debian 9 / raspbian/stretch)
           - platform: linux/arm/v7
             arch: armv7
+            dockerfile: Dockerfile
+            name: armv7
           - platform: linux/arm64
             arch: arm64
+            dockerfile: Dockerfile
+            name: arm64
+          # BASE-2 candidate (Debian 11 + vendored Debian-9 .debs)
+          - platform: linux/arm/v7
+            arch: armv7
+            dockerfile: Dockerfile.debian11-vendored
+            candidate: debian11-vendored
+            name: armv7-debian11-vendored
+          - platform: linux/arm64
+            arch: arm64
+            dockerfile: Dockerfile.debian11-vendored
+            candidate: debian11-vendored
+            name: arm64-debian11-vendored
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -78,29 +94,67 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: tidal-connect
-          file: tidal-connect/Dockerfile
+          file: tidal-connect/${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
           load: true
-          tags: tidal-connect:ci-${{ matrix.arch }}
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,scope=${{ matrix.arch }},mode=max
+          tags: tidal-connect:ci-${{ matrix.arch }}-${{ matrix.candidate || 'prod' }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
 
       - name: Verify shared-library resolution (ldd)
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          out="artifacts/ldd-${{ matrix.arch }}.txt"
+          out="artifacts/ldd-${{ matrix.name }}.txt"
           docker run --rm --platform ${{ matrix.platform }} \
-            --entrypoint /bin/bash tidal-connect:ci-${{ matrix.arch }} \
+            --entrypoint /bin/bash tidal-connect:ci-${{ matrix.arch }}-${{ matrix.candidate || 'prod' }} \
             -c 'ldd /app/ifi-tidal-release/bin/tidal_connect_application' \
             | tee "$out"
           if grep -E 'not found' "$out" > /dev/null; then
-            echo "::error::Unresolved shared libraries in tidal_connect_application on ${{ matrix.platform }}"
+            echo "::error::Unresolved shared libraries in tidal_connect_application on ${{ matrix.platform }} (candidate: ${{ matrix.candidate || 'production' }})"
             exit 1
           fi
-          echo "All shared libraries resolved on ${{ matrix.platform }}"
+          echo "All shared libraries resolved on ${{ matrix.platform }} (candidate: ${{ matrix.candidate || 'production' }})"
 
-      - name: Trivy scan (tidal-connect:ci-${{ matrix.arch }})
+      - name: Runtime smoke probe (BASE-2 candidate)
+        if: matrix.candidate == 'debian11-vendored'
+        run: |
+          set -euo pipefail
+          out="artifacts/smoke-${{ matrix.name }}.txt"
+          echo "Running 30-second smoke probe for tidal_connect_application..."
+          # The binary needs a valid certificate path and will fail without proper
+          # ALSA devices, but we're only verifying it doesn't segfault on load.
+          # Use timeout to cap the run; capture exit code to distinguish timeout (124)
+          # from crash (segfault = 139, missing lib = 127).
+          docker run --rm --platform ${{ matrix.platform }} \
+            --entrypoint /bin/bash tidal-connect:ci-${{ matrix.arch }}-${{ matrix.candidate }} \
+            -c 'timeout 30 /app/ifi-tidal-release/bin/tidal_connect_application \
+                  --tc-certificate-path /app/ifi-tidal-release/id_certificate/IfiAudio_ZenStream.dat \
+                  --playback-device plughw:0,0 \
+                  -f "CI Smoke Test" \
+                  --model-name "CI" 2>&1 || echo "exit_code=$?"' \
+            | tee "$out"
+          
+          # Check for library load failures (exit 127 or "error while loading")
+          if grep -qE '(error while loading shared libraries|exit_code=127)' "$out"; then
+            echo "::error::Binary failed to load shared libraries on ${{ matrix.platform }}"
+            cat "$out"
+            exit 1
+          fi
+          
+          # Check for segfault (exit 139 or signal 11)
+          if grep -qE '(Segmentation fault|exit_code=139)' "$out"; then
+            echo "::error::Binary segfaulted on ${{ matrix.platform }}"
+            cat "$out"
+            exit 1
+          fi
+          
+          # Timeout (124) or other exit codes are acceptable here — the binary
+          # will fail to initialize ALSA without /dev/snd, but we only care that
+          # it loaded cleanly.
+          echo "Smoke probe passed: binary loaded and ran without segfault on ${{ matrix.platform }}"
+
+      - name: Trivy scan (tidal-connect:ci-${{ matrix.arch }}-${{ matrix.candidate || 'prod' }})
         # CI-8 (TODO.md): hard-gate. Any HIGH/CRITICAL finding that
         # is fixable AND not allowlisted in .trivyignore fails the
         # build. ignore-unfixed: true keeps EOL CVEs with no patch
@@ -110,7 +164,7 @@ jobs:
         # the .trivyignore header for the full rationale.
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: tidal-connect:ci-${{ matrix.arch }}
+          image-ref: tidal-connect:ci-${{ matrix.arch }}-${{ matrix.candidate || 'prod' }}
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -121,7 +175,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ldd-${{ matrix.arch }}
+          name: ldd-${{ matrix.name }}
           path: artifacts/
           retention-days: 14
 

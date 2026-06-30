@@ -1,0 +1,118 @@
+# BASE-2 candidate: Debian 11 (bullseye) + vendored Debian-9 libraries
+# Hypothesis: vendor libssl1.0.2, libcurl3, FFmpeg 3.x, and FLAC 8 from
+# Debian 9 (stretch) under /opt/legacy-libs, set LD_LIBRARY_PATH, and
+# install stable libs (portaudio, alsa, avahi) from Debian 11.
+#
+# The vendor binary (tidal_connect_application) requires symbol versions
+# only present in Debian 9 builds: OPENSSL_1.0.0, CURL_OPENSSL_3,
+# LIBAV*_5{5,7}, etc. SONAME symlinks to newer libs fail (BASE-1 refuted
+# in CI run 28461155940). This approach ships the actual Debian-9 .so files.
+#
+# License review: All vendored packages are redistributable (see note below).
+# Snapshot timestamp: 20200630T000000Z (Debian 9 near EOL, stable archive).
+
+FROM debian:11-slim
+
+# Install stable packages from Debian 11 (compatible across Debian 8-12)
+RUN apt-get update -y -q && \
+    apt-get install -y -q --no-install-recommends \
+    libportaudio2 \
+    libasound2 \
+    libavahi-common3 \
+    libavahi-client3 \
+    avahi-daemon \
+    alsa-utils \
+    tmux \
+    dbus \
+    curl \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Vendor Debian-9 legacy libraries
+# We extract .so files only to /opt/legacy-libs to avoid dependency graph
+# conflicts with Debian-11 native packages (e.g. libssl3 vs libssl1.0.0).
+RUN mkdir -p /tmp/debs /opt/legacy-libs
+
+# OpenSSL 1.0.2 (Debian 9 stretch)
+# License: OpenSSL License (BSD-style, redistributable with notice)
+# SONAME: libssl.so.1.0.0, libcrypto.so.1.0.0
+# Symbol versions: OPENSSL_1.0.0, OPENSSL_1.0.1 (not present in OpenSSL 1.1/3.0)
+RUN cd /tmp/debs && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/o/openssl/libssl1.0.2_1.0.2u-1~deb9u7_armhf.deb && \
+    dpkg-deb -x libssl1.0.2_1.0.2u-1~deb9u7_armhf.deb extract && \
+    cp -a extract/usr/lib/arm-linux-gnueabihf/libssl.so.1.0.* /opt/legacy-libs/ && \
+    cp -a extract/usr/lib/arm-linux-gnueabihf/libcrypto.so.1.0.* /opt/legacy-libs/
+
+# libcurl3 (Debian 9 stretch, built against OpenSSL 1.0)
+# License: curl License (MIT-style, redistributable)
+# SONAME: libcurl.so.4 (stable across Debian 8-12)
+# Symbol version: CURL_OPENSSL_3 (only in libcurl linked against OpenSSL 1.0)
+RUN cd /tmp/debs && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/c/curl/libcurl3_7.52.1-5+deb9u13_armhf.deb && \
+    dpkg-deb -x libcurl3_7.52.1-5+deb9u13_armhf.deb extract-curl && \
+    cp -a extract-curl/usr/lib/arm-linux-gnueabihf/libcurl.so.4* /opt/legacy-libs/
+
+# FFmpeg 3.x (Debian 9 stretch)
+# License: LGPL-2.1+ (the standard Debian build; redistributable with notice)
+# SONAMEs: libavformat.so.57, libavcodec.so.57, libavutil.so.55, libswresample.so.2
+# Symbol versions: LIBAVFORMAT_57, LIBAVCODEC_57, LIBAVUTIL_55, LIBSWRESAMPLE_2
+RUN cd /tmp/debs && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libavformat57_3.2.15-0+deb9u3_armhf.deb && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libavcodec57_3.2.15-0+deb9u3_armhf.deb && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libavutil55_3.2.15-0+deb9u3_armhf.deb && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/ffmpeg/libswresample2_3.2.15-0+deb9u3_armhf.deb && \
+    dpkg-deb -x libavformat57_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
+    dpkg-deb -x libavcodec57_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
+    dpkg-deb -x libavutil55_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
+    dpkg-deb -x libswresample2_3.2.15-0+deb9u3_armhf.deb extract-ffmpeg && \
+    cp -a extract-ffmpeg/usr/lib/arm-linux-gnueabihf/libav*.so.* /opt/legacy-libs/ && \
+    cp -a extract-ffmpeg/usr/lib/arm-linux-gnueabihf/libswresample.so.* /opt/legacy-libs/
+
+# FLAC 8 (Debian 9 stretch)
+# License: BSD-style (Xiph.Org license, redistributable)
+# SONAMEs: libFLAC.so.8, libFLAC++.so.6
+RUN cd /tmp/debs && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/flac/libflac8_1.3.2-1_armhf.deb && \
+    curl -fsSL -O https://snapshot.debian.org/archive/debian/20200630T000000Z/pool/main/f/flac/libflac++6v5_1.3.2-1_armhf.deb && \
+    dpkg-deb -x libflac8_1.3.2-1_armhf.deb extract-flac && \
+    dpkg-deb -x libflac++6v5_1.3.2-1_armhf.deb extract-flac && \
+    cp -a extract-flac/usr/lib/arm-linux-gnueabihf/libFLAC*.so.* /opt/legacy-libs/
+
+# Cleanup
+RUN rm -rf /tmp/debs
+
+# License notice addendum: The vendored packages' licenses are preserved in
+# tidal-connect/src/licenses/ (vendor binary's dependencies). The Debian
+# packages themselves carry:
+# - libssl1.0.2: /usr/share/doc/libssl1.0.2/copyright (OpenSSL License)
+# - libcurl3: /usr/share/doc/libcurl3/copyright (curl License)
+# - libav*: /usr/share/doc/libavformat57/copyright (LGPL-2.1+)
+# - libflac*: /usr/share/doc/libflac8/copyright (BSD-3-Clause / Xiph.Org)
+# All are redistributable in binary form with attribution. Full license texts
+# are at https://snapshot.debian.org/archive/debian/20200630T000000Z/ under
+# each package's .../copyright file.
+
+# Copy application binaries and files
+RUN mkdir -p /app/ifi-tidal-release
+WORKDIR /app/ifi-tidal-release
+
+COPY src/bin/ bin
+COPY src/pa_devs/ .
+COPY src/play .
+COPY src/id_certificate id_certificate
+COPY src/licenses licenses
+RUN chmod a+x bin/*
+
+# Set environment variables
+ENV PA_ALSA_PLUGHW=1
+# Prepend /opt/legacy-libs to LD_LIBRARY_PATH so the vendor binary finds
+# Debian-9 SONAMEs first, falling back to system paths for transitive deps
+ENV LD_LIBRARY_PATH=/opt/legacy-libs
+
+# Add entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Define entrypoint and default command
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []
