@@ -12,11 +12,76 @@
 # Scope of the gate (set in .github/workflows/ci.yml):
 #   severity:        HIGH,CRITICAL
 #   ignore-unfixed:  true     # finding is hidden if no patched version exists
-#   gate:            warn-only initially (CI-6); hard-fail planned in CI-8.
-#
-# This file starts empty on purpose: we want the first Trivy CI run to
-# print the full list of fixable HIGH/CRITICAL findings in the build
-# logs so we can decide each one consciously rather than silencing
-# whole classes up front.
+#   gate:            hard-fail (exit-code: 1) — set by CI-8.
 
-# (no allowlist entries yet)
+# ===========================================================================
+# Block 1 — Debian-9 vendor-lock CVEs in tidal-connect image (CI-6 baseline).
+#
+# Source of the lock: tidal-connect/Dockerfile lines 28–35 deliberately
+# downgrade libssl1.0.0 and libcurl3 to **Debian-8** builds
+# (1.0.1t-1+deb8u12 / 7.38.0-4+deb8u16) pulled from snapshot.debian.org,
+# because tidal_connect_application requires those exact symbol versions.
+# See AGENTS.md §2 "library pins are intentional" for the full SONAME
+# inventory verified by ldd in CI.
+#
+# Why none of these are fixable for us:
+#   - Trivy's suggested "Fixed Version" column points at Debian-9 OpenSSL
+#     1.1.0 backports (e.g. 1.1.0l-1~deb9u5). The vendor binary loads
+#     libssl.so.1.0.0 / libcrypto.so.1.0.0 (OpenSSL 1.0.x SONAMEs only)
+#     — bumping to 1.1.x breaks ldd resolution and the binary fails to
+#     start. The TIDAL Connect protocol has no FOSS replacement
+#     (AGENTS.md §2) so re-linking is not an option.
+#   - libldap-2.4-2 is pulled transitively by libcurl3; Debian-9 ELTS
+#     ships 2.4.44+dfsg-5+deb9u9 only via the paid Freexian channel,
+#     which is not on snapshot.debian.org.
+#
+# Compensating controls: container runs read-only paths where possible,
+# `network_mode: host` is on a trusted LAN only (consumer Snapcast
+# deployment), and exposure to remote curl/openssl input is limited to
+# the TIDAL backend (HTTPS to api.tidal.com, controlled by the binary).
+#
+# Revisit conditions: any of (a) successful base-image swap by the
+# base-image-modernizer agent (BASE-1/2), (b) iFi/vendor publishing a
+# new binary with newer SONAMEs, (c) ELTS subscription added.
+#
+# CVE list extracted from CI run 28457038986 (commit d241204). Re-verify
+# the set whenever Trivy DB updates surface new fixable HIGH/CRITICAL
+# findings in libcurl3 / libldap-2.4-2 / libssl1.0.0.
+# ===========================================================================
+
+# --- libcurl3 (14 CRITICAL + 10 HIGH) -------------------------------------
+CVE-2017-1000254
+CVE-2017-1000257
+CVE-2017-8816
+CVE-2017-8817
+CVE-2018-1000005
+CVE-2018-1000007
+CVE-2018-1000120
+CVE-2018-1000121
+CVE-2018-1000122
+CVE-2018-1000301
+CVE-2018-14618
+CVE-2018-16839
+CVE-2018-16842
+CVE-2018-16890
+CVE-2019-3822
+CVE-2019-3823
+CVE-2019-5436
+CVE-2019-5481
+CVE-2019-5482
+CVE-2020-8177
+CVE-2020-8231
+CVE-2020-8285
+CVE-2020-8286
+CVE-2021-22946
+
+# --- libldap-2.4-2 / libldap-common (1 CRITICAL, transitive via libcurl3) -
+CVE-2022-29155
+
+# --- libssl1.0.0 (6 HIGH) -------------------------------------------------
+CVE-2018-0732
+CVE-2019-1543
+CVE-2021-23840
+CVE-2021-3712
+CVE-2022-0778
+CVE-2022-1292
