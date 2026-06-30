@@ -127,3 +127,125 @@ backoff up to ~90 s total (commit `720a7a3`). That suffices for kernel
 `TIME_WAIT` (60 s typical), but **does not** help when Snapserver
 itself is holding the port in its own memory — only restarting
 Snapserver, or picking a different port, clears that state.
+
+## BASE-1: Debian 12 + SONAME symlinks does not satisfy the vendor binary (refuted)
+
+> **Status (2026-06-30): refuted.** Empirical evidence from CI run
+> [28461155940](https://github.com/moskakos/tidal-connect-docker/actions/runs/28461155940)
+> on branch `feat/base-1-debian12-refute` (commit `649fbb3`). The
+> experimental Dockerfile was **not** merged to `dev`; this section is
+> the durable record of the negative result so the experiment is not
+> repeated.
+
+### Hypothesis tested
+
+Rebase the `tidal-connect` image on `debian:bookworm-slim` (Debian 12),
+install the current Debian-12 versions of the libraries the vendor
+binary needs (`libssl3`, `libavformat59`, `libavcodec59`, `libavutil57`,
+`libswresample4`, `libflac12`, `libflac++10`, plus the libs that have
+been stable since Debian 8: `libcurl4`, `libportaudio2`, `libasound2`,
+`libavahi-client3`, `libavahi-common3`), then create SONAME-only
+compatibility symlinks for the Debian-9-era names the binary expects:
+
+| Expected by binary (Debian 9)   | Symlinked to (Debian 12)        |
+|---------------------------------|---------------------------------|
+| `libssl.so.1.0.0`               | `libssl.so.3`                   |
+| `libcrypto.so.1.0.0`            | `libcrypto.so.3`                |
+| `libavformat.so.57`             | `libavformat.so.59`             |
+| `libavcodec.so.57`              | `libavcodec.so.59`              |
+| `libavutil.so.55`               | `libavutil.so.57`               |
+| `libswresample.so.2`            | `libswresample.so.4`            |
+| `libFLAC.so.8`                  | `libFLAC.so.12`                 |
+| `libFLAC++.so.6`                | `libFLAC++.so.10`               |
+
+The expectation was: `ldd` resolves all SONAMEs (because the loader
+can open the symlink targets), and *if* `ldd` passes we add a
+runtime-execution probe to see what really breaks. The expectation was
+wrong about which check fires first.
+
+### Result
+
+`ldd` **fails on both `linux/arm/v7` and `linux/arm64`**. The loader
+opens the target SOs without trouble — the problem is one level deeper:
+the binary requests **versioned symbols** that the newer libraries do
+not provide.
+
+The verbatim failures (CI run `28461155940`, both arches):
+
+```text
+.../libssl.so.1.0.0:        version `OPENSSL_1.0.0'   not found
+.../libssl.so.1.0.0:        version `OPENSSL_1.0.1'   not found
+.../libcrypto.so.1.0.0:     version `OPENSSL_1.0.0'   not found
+.../libcurl.so.4:           version `CURL_OPENSSL_3'  not found
+.../libavcodec.so.57:       version `LIBAVCODEC_57'   not found
+.../libavformat.so.57:      version `LIBAVFORMAT_57'  not found
+.../libavutil.so.55:        version `LIBAVUTIL_55'    not found
+.../libswresample.so.2:     version `LIBSWRESAMPLE_2' not found
+```
+
+(Each line is prefixed with the binary path; trimmed here for clarity.)
+
+`libFLAC.so.8` / `libFLAC++.so.6` did **not** raise version errors,
+suggesting FLAC does not export versioned symbols (or the vendor binary
+does not depend on any versioned ones). They are still a runtime
+correctness gamble, just not blocked at ldd time.
+
+### Why the experiment was guaranteed to fail
+
+The vendor binary was linked against Debian-9 libraries that **do**
+emit GNU symbol versions (verified by `objdump -T` on the original
+SOs). Linux's dynamic loader (`ld-linux*.so.3` / `ld-linux-aarch64.so.1`)
+performs the version check in `_dl_check_map_versions` and refuses to
+proceed when a requested `VERDEF` is missing from the resolved SO,
+even if the unversioned symbol name does exist. A SONAME symlink only
+solves the *file-open* problem; it does nothing about the *version
+table* inside the SO.
+
+This applies regardless of how the symlink is created (`ln -s`,
+`ldconfig` alias, `LD_LIBRARY_PATH`, `LD_PRELOAD` — all share the same
+post-open versioning logic).
+
+Note on `libcurl.so.4`: this SONAME is stable across Debian 8–12, but
+the *symbol version* `CURL_OPENSSL_3` is specific to libcurl builds
+linked against OpenSSL 1.0 (Debian 8/9). Debian 10+ libcurl rebuilt
+against OpenSSL 1.1+/3.0 emits `CURL_OPENSSL_4`. **`AGENTS.md` §2's
+note that libcurl is "compatible across Debian 8–12" is true for SONAME
+compatibility but wrong for symbol-version compatibility** — the
+binary needs a libcurl built against OpenSSL 1.0, which only Debian
+8/9 (and historical snapshots) ship.
+
+### Consequences for BASE-2 and beyond
+
+The only path to a newer base image is to **provide the actual
+Debian-9 .so files** alongside the newer base. Concretely, BASE-2's
+approach (a) — vendor the Debian-9 `.deb`s for `libssl1.0.0`,
+`libcurl3`, `libavformat57` (+ `-codec57`, `-util55`, `-swresample2`),
+`libflac8`, `libflac++6v5` into `/opt/legacy-libs` on a Debian-11 (or
+-12) base and set `LD_LIBRARY_PATH=/opt/legacy-libs` for the vendor
+binary's launcher.
+
+This is structurally similar to what the current `raspbian/stretch`
+image does, just inverted: instead of pinning the *whole base* to
+Debian 9, vendor only the *legacy libraries* into a modern base, while
+all surrounding tooling (`apt`, `bash`, `coreutils`, security
+patches, `libc`) tracks the newer release.
+
+Open question for BASE-2: glibc compatibility. The vendor binary was
+linked against glibc 2.24 (Debian 9). Debian 11 ships glibc 2.31,
+Debian 12 ships glibc 2.36. Newer glibc is forward-compatible with
+older binaries by design (`GLIBC_2.X` symbols accumulate), so this is
+not expected to be a problem — but worth verifying with `ldd` /
+`objdump -T` on the binary's `libc.so.6` deps as the first step of
+BASE-2.
+
+### Reproducing this
+
+```bash
+git fetch origin feat/base-1-debian12-refute
+git checkout feat/base-1-debian12-refute
+# inspect tidal-connect/Dockerfile to see the experiment
+# CI run linked above contains the artifact ldd-armv7.zip /
+# ldd-arm64.zip with the full ldd output
+```
+
+The branch is preserved on `origin` as evidence; it will not be merged.

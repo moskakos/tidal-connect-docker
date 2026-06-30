@@ -33,19 +33,29 @@ Linux. It contains:
   Debian 9 packages — any base-image change must keep them satisfied:
   - **OpenSSL 1.0:** `libssl.so.1.0.0`, `libcrypto.so.1.0.0`
     (Debian 8/9 only; Debian 10+ ships 1.1, Debian 12 ships 3.0 — neither
-    is binary-compatible)
-  - **curl:** `libcurl.so.4` (compatible across Debian 8–12)
+    is binary-compatible; symbol versions `OPENSSL_1.0.0` / `OPENSSL_1.0.1`
+    are absent from 1.1/3.0)
+  - **curl:** `libcurl.so.4` SONAME is stable across Debian 8–12, but
+    the binary needs the symbol version `CURL_OPENSSL_3` — emitted only
+    by libcurl builds linked against OpenSSL 1.0 (Debian 8/9). Debian
+    10+ libcurl emits `CURL_OPENSSL_4`; not interchangeable. See
+    [docs/troubleshooting.md](docs/troubleshooting.md#base-1-debian-12--soname-symlinks-does-not-satisfy-the-vendor-binary-refuted).
   - **FFmpeg 3.x:** `libavformat.so.57`, `libavcodec.so.57`,
     `libavutil.so.55`, `libswresample.so.2` (Debian 9 only; Debian 10
-    ships FFmpeg 4 → `.58` SONAMEs, **not in Debian 10+ repos at all**)
+    ships FFmpeg 4 → `.58` SONAMEs, **not in Debian 10+ repos at all**;
+    symbol versions `LIBAV*_5{5,7}` / `LIBSWRESAMPLE_2` are not
+    backported)
   - **FLAC:** `libFLAC.so.8`, `libFLAC++.so.6` (Debian 9 only; Debian 11+
     ships `.12`)
   - **Audio/mDNS:** `libportaudio.so.2`, `libasound.so.2`,
     `libavahi-client.so.3`, `libavahi-common.so.3` (compatible across
     Debian 8–12)
-  Practical implication: moving past Debian 9 requires either shipping
-  Debian-9 .deb files for FFmpeg 3 and FLAC 8 inside a newer base, or
-  proving the binary tolerates newer SONAMEs (unlikely without source).
+  Practical implication: moving past Debian 9 requires shipping
+  Debian-9 `.deb` files for OpenSSL 1.0, libcurl3, FFmpeg 3 and FLAC 8
+  inside a newer base (BASE-2 approach (a)). SONAME aliasing alone is
+  insufficient — refuted empirically by BASE-1 (CI run
+  [28461155940](https://github.com/moskakos/tidal-connect-docker/actions/runs/28461155940),
+  documented in [docs/troubleshooting.md](docs/troubleshooting.md#base-1-debian-12--soname-symlinks-does-not-satisfy-the-vendor-binary-refuted)).
 - **`network_mode: host` is required** in `docker-compose.yml` for mDNS /
   Avahi discovery by the TIDAL app. The binary links against
   `libavahi-client.so.3` (verified by `ldd`); removing host networking
