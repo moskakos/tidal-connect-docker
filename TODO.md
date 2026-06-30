@@ -25,7 +25,7 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-06-30.
+> Last refresh: 2026-06-30 (CI-5 done, ee84a35).
 
 ## Active
 
@@ -39,8 +39,8 @@ _(no active task — pick a `P1` row below and flip its Status to 🟡)_
 | ✅     |     | CI-2 | yamllint step in lint job                                                | b911521 |
 | ✅     |     | CI-3 | `.dockerignore` review for both build contexts                           | 6e373d1 |
 | ✅     |     | CI-4 | Pin third-party images by digest                                         | 4e6b8ed |
-| 🔴     | P1  | CI-5 | Healthcheck for `tidal-forwarder-arecord` (`pgrep -x arecord`)           | —       |
-| 🔴     | P2  | CI-6 | Trivy scan job + `.trivyignore`                                          | —       |
+| ✅     |     | CI-5 | Healthcheck for `tidal-forwarder-arecord` (`pgrep -x arecord`)           | ee84a35 |
+| 🔴     | P1  | CI-6 | Trivy scan job + `.trivyignore`                                          | —       |
 | ✅     |     | CI-7 | Smoke test job (Tier 2.5; build + JSON-RPC + cleanup)                    | 7ba5871 |
 
 ## security-hardener
