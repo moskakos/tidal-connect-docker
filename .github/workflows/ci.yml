@@ -106,7 +106,7 @@ jobs:
         # populating .trivyignore. CI-8 will flip exit-code to 1.
         # ignore-unfixed: hides findings with no patched version (large
         # share of Debian-9 EOL CVEs); we can only act on fixables.
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tidal-connect:ci-${{ matrix.arch }}
           format: table
@@ -262,7 +262,7 @@ jobs:
         # CI-6 (TODO.md): same report-only policy as the tidal-connect
         # scan in build-and-ldd. forwarder-arecord uses an Alpine base
         # so the finding count should be small.
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tidal-forwarder-arecord:ci
           format: table
