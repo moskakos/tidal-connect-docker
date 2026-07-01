@@ -100,14 +100,19 @@ RUN apt-get update -y -q && \
 # Bring the entire Debian-9 armhf lib closure from the legacy stage into
 # /opt/legacy-libs. This includes:
 # - libavformat57 + libavcodec57 + their ~30 transitive codec deps (libx264,
-#   libopus, libvorbis, libmp3lame, libidn11, ...)
+#   libopus, libvorbis, libmp3lame, ...)
 # - libflac8, libflac++6v5
 # - libssl1.0.0, libcrypto1.0.0 (Debian 8 override, exports OPENSSL_1.0.0/
 #   OPENSSL_1.0.1 symbol versions the vendor binary requires)
 # - libcurl.so.4 (Debian 8 build, exports CURL_OPENSSL_3, links against
 #   libssl.so.1.0.0)
 # plus every SONAME symlink apt/ldconfig created in the legacy stage.
+#
+# Note: Debian 9 pre-usrmerge — some libs live in /lib/arm-linux-gnueabihf/
+# rather than /usr/lib/arm-linux-gnueabihf/ (e.g. libidn11). Copy both
+# directories; contents are disjoint on Debian 9 so no overwrite conflict.
 COPY --from=legacy /usr/lib/arm-linux-gnueabihf/ /opt/legacy-libs/
+COPY --from=legacy /lib/arm-linux-gnueabihf/     /opt/legacy-libs/
 
 # Re-run ldconfig against the target image's copy of the dir so any missing
 # SONAME aliases get recreated. -n limits to the named directory and does
