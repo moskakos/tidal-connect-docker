@@ -66,6 +66,13 @@ Linux. It contains:
   insufficient — refuted empirically by BASE-1 (CI run
   [28461155940](https://github.com/moskakos/tidal-connect-docker/actions/runs/28461155940),
   documented in [docs/troubleshooting.md](docs/troubleshooting.md#base-1-debian-12--soname-symlinks-does-not-satisfy-the-vendor-binary-refuted)).
+  A working Debian-11 candidate exists at
+  [`tidal-connect/Dockerfile.debian11-vendored`](tidal-connect/Dockerfile.debian11-vendored)
+  on branch `feat/base-2-debian11-vendored` (CI validation run
+  [28534452841](https://github.com/moskakos/tidal-connect-docker/actions/runs/28534452841),
+  documented in [docs/troubleshooting.md](docs/troubleshooting.md#base-2-debian-11--vendored-debian-9-libs-validated)).
+  Production cutover is a separate human decision that requires a real
+  Raspberry Pi + TIDAL-phone-app smoke test outside CI's reach.
 - **`network_mode: host` is required** in `docker-compose.yml` for mDNS /
   Avahi discovery by the TIDAL app. The binary links against
   `libavahi-client.so.3` (verified by `ldd`); removing host networking

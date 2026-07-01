@@ -249,3 +249,116 @@ git checkout feat/base-1-debian12-refute
 ```
 
 The branch is preserved on `origin` as evidence; it will not be merged.
+
+## BASE-2: Debian 11 + vendored Debian-9 libs (validated)
+
+> **Status (2026-07-01): validated.** Empirical evidence from CI run
+> [28534452841](https://github.com/moskakos/tidal-connect-docker/actions/runs/28534452841)
+> on branch `feat/base-2-debian11-vendored` (commit `6540958`). The
+> candidate Dockerfile is preserved as
+> [`tidal-connect/Dockerfile.debian11-vendored`](../tidal-connect/Dockerfile.debian11-vendored)
+> on that branch — **not** merged into `dev` because the production
+> Dockerfile cutover is a human decision (needs a real-hardware TIDAL
+> phone-app smoke test that CI cannot do).
+
+### Hypothesis validated
+
+Multi-stage Docker build:
+
+- **Stage 1 (`legacy`)** — `FROM --platform=linux/arm/v7 raspbian/stretch`.
+  `apt install` FFmpeg 3.x (`libavformat57`, `libavcodec57`, `libavutil55`,
+  `libswresample2`), FLAC 8 (`libflac8`, `libflac++6v5`), `libidn11`, and
+  `curl` from stretch. Then override with **Debian-8** `libssl1.0.0` and
+  `libcurl3` from `snapshot.debian.org` — same URLs the production
+  Dockerfile has always used. apt handles the ~30 FFmpeg transitive codec
+  deps (`libx264`, `libopus`, `libvorbis`, `libmp3lame`, …) automatically
+  with correct SONAME symlinks.
+- **Stage 2 (runtime)** — `FROM --platform=linux/arm/v7 debian:11-slim`.
+  Native apt install of stable-across-releases libs (`libportaudio2`,
+  `libasound2`, `libavahi-*`, `libbsd0`, `avahi-daemon`, `alsa-utils`).
+  Then `COPY --from=legacy` for BOTH `/usr/lib/arm-linux-gnueabihf/` and
+  `/lib/arm-linux-gnueabihf/` into `/opt/legacy-libs`. Prune Debian-9
+  glibc-family files from `/opt/legacy-libs`. `ldconfig -n` to
+  (re-)create SONAME symlinks. `ENV LD_LIBRARY_PATH=/opt/legacy-libs`.
+
+### CI result
+
+```text
+All libraries resolved on linux/arm64 (debian11-vendored)
+Running 30-second smoke probe for tidal_connect_application...
+exit_code=1
+Smoke probe passed: binary loaded and ran without segfault on linux/arm64
+```
+
+The binary loads all its shared libraries (no `not found`, no
+`error while loading shared libraries`, no segfault). It exits with
+code 1 as expected in CI — no real ALSA devices, no valid TIDAL
+certificate, no mDNS on the host network — but that is an
+application-level exit, not a linker or ABI failure. Same criterion
+CI already applies to the production Dockerfile passes here.
+
+### Key lessons (8-iteration path to green)
+
+| # | Commit    | Lesson                                                                                                                       |
+|---|-----------|------------------------------------------------------------------------------------------------------------------------------|
+| 1 | `bf40068` | Initial subagent attempt: snapshot.debian.org URLs (path `debian/` was wrong; correct is `debian-security/` for these pkgs). |
+| 2 | `da5d302` | Correct URLs resolved via `snapshot.debian.org` `/mr/binary/<pkg>/<ver>/binfiles?fileinfo=1` metadata API. `linux/arm/v7` platform pinning forced (vendor binary armhf-only). |
+| 3 | `b6fb856` | Debian `.deb`s ship the real `.so` file; the SONAME→file symlink is created by postinst `ldconfig` — bypass with `ldconfig -n` on the target dir. |
+| 4 | `53f19f7` | Snapshot-URL harvest stalls at ~30 FFmpeg transitive codec deps (`libx264`, `libopus`, `libvorbis`, …). Switch to multi-stage build: `FROM raspbian/stretch AS legacy` + `apt install` handles the closure automatically. |
+| 5 | `54a333c` | Debian 9's `libssl1.0.2` SONAME is `libssl.so.1.0.2`, not `libssl.so.1.0.0` (verified with `strings`). ldconfig won't create a mismatched alias. Explicit `ln -sf` works for the *filename* but the *symbol version* table still refuses (same class of refute as BASE-1). |
+| 6 | `5bf9769` | Fix: use **Debian 8**'s `libssl1.0.0` and `libcurl3` from `snapshot.debian.org` — they emit the `OPENSSL_1.0.0` / `OPENSSL_1.0.1` / `CURL_OPENSSL_3` symbol version tags the vendor binary actually needs. This is the same override the production Dockerfile has always used. |
+| 7 | `25afdfc` | Debian 9 is pre-usrmerge: `libidn.so.11` lives in `/lib/arm-linux-gnueabihf/`, not `/usr/lib/…`. Add a second `COPY --from=legacy` for `/lib/…`. |
+| 8 | `6540958` | The second COPY brings Debian 9's `libc.so.6` (glibc 2.24) too, and `LD_LIBRARY_PATH=/opt/legacy-libs` then makes every Debian 11 binary (`/bin/sh`, `chmod`, …) load the old libc first and crash with `GLIBC_2.28 not found`. Fix: `rm` glibc-family SO files from `/opt/legacy-libs` after both COPYs. Debian 11's glibc 2.31 is forward-compatible so the Debian-9 SOs still work. |
+
+Everything above is captured in the individual commit messages on
+`feat/base-2-debian11-vendored`; they are the primary reference if the
+approach ever needs to be re-derived.
+
+### Consequences
+
+- The base-image-modernization scope (BASE-1 refuted approach (c),
+  BASE-2 validated approach (a)) is now conclusive: **only vendoring
+  Debian-9/8 libraries into a modern base image works.** SONAME
+  symlinks alone are refuted; matching-version overrides on the actual
+  library files are required.
+- Trivy CVE count on the candidate image should be lower than the
+  production `raspbian/stretch` image (Debian 11 base + modern
+  `libavahi-*`/`libportaudio2`/`libasound2` from Debian 11
+  security-patched builds). Not yet measured; a future task can quantify.
+- Runtime CPU / memory / startup-time on real hardware are not yet
+  measured; a future task can quantify.
+
+### Handoff for production cutover (human decision)
+
+To swap production to the candidate:
+
+1. Rename `tidal-connect/Dockerfile.debian11-vendored` → `Dockerfile`
+   (or update `docker-compose.yml` to build from the candidate file).
+2. Rebuild + push to real Raspberry Pi hardware.
+3. Manually verify with the TIDAL phone app: device is discovered via
+   mDNS, playback starts and continues without dropouts, forwarder
+   pipeline (either `ffmpeg` or `arecord` profile) works unchanged.
+4. Only then decide whether the CI matrix should keep the production
+   Dockerfile as a legacy reference or drop it.
+
+A safer alternative to a straight swap is a Compose-profile
+side-by-side (like `ffmpeg` vs `arecord` for the forwarder): keep both
+Dockerfiles, add `docker-compose.debian11.yml` with `image:` overrides,
+run both variants on the deployment host for a few weeks before
+retiring the old one.
+
+### Reproducing this
+
+```bash
+git fetch origin feat/base-2-debian11-vendored
+git checkout feat/base-2-debian11-vendored
+# inspect tidal-connect/Dockerfile.debian11-vendored — the working
+# multi-stage build.
+# CI run linked above contains the ldd-arm64-debian11-vendored artifact
+# with the full ldd output and the smoke probe stdout.
+```
+
+The branch is preserved on `origin` as evidence; the Dockerfile,
+CI matrix entry, and smoke probe stay there until the human decides to
+promote the candidate to production.
+
