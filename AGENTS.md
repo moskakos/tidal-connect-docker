@@ -202,22 +202,53 @@ Open a discussion with the user before:
 
 ## 10. Available MCP servers and tool preferences
 
-This workspace has the following MCP servers configured. **Prefer these
-over terminal wrappers** whenever the task fits their scope — MCP calls
-do not require per-command terminal approval and return typed results
-directly.
+**Tool selection priority** (always try in this order; only fall back
+when the higher option truly cannot do the job):
+
+1. **Built-in workspace tools** — `read_file`, `grep_search`,
+   `file_search`, `semantic_search`, `replace_string_in_file`,
+   `multi_replace_string_in_file`, `manage_todo_list`, memory
+   operations, etc. These have zero approval friction, return typed
+   results, and are optimised for the VS Code chat/agent surfaces.
+2. **MCP-server tools** (see table below) — `mcp_mcp-jq_*`,
+   `mcp_github_mcp_s2_*`, `mcp_github_mcp_se_*`. Also zero approval
+   friction; use them for anything that fits their scope.
+3. **Terminal commands** (`run_in_terminal`) — **last resort.** Every
+   invocation prompts the user for approval. Reserve for actions the
+   above tools cannot express (git operations, shell pipelines,
+   invoking `docker`/`yamllint`/`hadolint`/`ssh`, one-off diagnostics).
+   When multiple shell steps are unavoidable, batch them into a single
+   pipeline so one approval covers the whole flow.
+
+Common substitutions to keep in mind:
+
+| Instead of terminal…    | Prefer the built-in                                          |
+|-------------------------|--------------------------------------------------------------|
+| `grep -rn 'pattern'`      | `grep_search` (regex, workspace-scoped, no approval)         |
+| `cat` / `sed -n Np`       | `read_file` with `startLine` / `endLine`                     |
+| `wc -l file`              | `read_file` — you usually want the content, not just a count |
+| `find . -name '*.md'`     | `file_search` with a glob                                    |
+| `ls dir/`                 | `list_dir`                                                   |
+| Running `jq` in a pipe    | `mcp_mcp-jq_jq_query_file` (workspace-scope MCP)             |
+| Polling GitHub REST APIs  | `mcp_github_mcp_s2_*` / `mcp_github_mcp_se_*`                |
+
+### 10.1 MCP servers configured in this workspace
+
+The following MCP servers back the "prefer MCP" rule above. MCP calls
+return typed results directly.
 
 | MCP server | Scope        | Configured in                          | Prefer over                                                         |
 |------------|--------------|-----------------------------------------|---------------------------------------------------------------------|
 | `jq`             | workspace | [.vscode/mcp.json](.vscode/mcp.json)                                       | shell `jq` piped through the terminal (each `jq` call needs approval) |
-| `github`         | user      | `~/Library/Application Support/Code/User/mcp.json`                         | `gh` CLI (not installed) or `curl` to `api.github.com`                |
+| `github`         | user      | `~/Library/Application Support/Code/User/mcp.json`                         | `gh` CLI (not installed) or `curl` to `api.githubcopilot.com`         |
 | `github-actions` | user      | `~/Library/Application Support/Code/User/mcp.json`                         | `curl` to Actions API, `gh run …`                                     |
 
 Terminal fallback is fine when the MCP tool is unavailable (e.g. inside
-a subagent that lacks the server in its `tools:` allowlist — see below)
-or when a one-off shell pipeline is genuinely simpler.
+a subagent that lacks the server in its `tools:` allowlist — see §10.2)
+or when a one-off shell pipeline is genuinely simpler than three MCP
+round-trips.
 
-### 10.1 Subagent MCP inheritance
+### 10.2 Subagent MCP inheritance
 
 Subagents do **NOT** inherit workspace- or user-scope MCP servers by
 default. Verified empirically 2026-06-30: an `Explore` subagent reported
@@ -242,4 +273,5 @@ disk and let the main thread parse it back on the next turn.
 Workspace toolset [`.github/prompts/tidal-connect-docker.toolsets.jsonc`](.github/prompts/tidal-connect-docker.toolsets.jsonc)
 aggregates these globs for main-thread convenience; toolsets do not
 propagate to subagents.
+
 
