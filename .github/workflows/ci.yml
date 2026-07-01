@@ -60,8 +60,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: linux/arm/v7
-            arch: armv7
+          # arm64 is the only CI target: it exercises armhf image content
+          # under arm64-host QEMU emulation, which mirrors how the vendor
+          # binary runs on modern 64-bit Raspberry Pi hosts (Pi 3 and up,
+          # all 64-bit-capable). See AGENTS.md §2 for the armhf-only
+          # vendor-binary constraint and why native armv7 CI adds no signal.
           - platform: linux/arm64
             arch: arm64
     steps:
