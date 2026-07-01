@@ -2,7 +2,7 @@
 description: "Use for GitHub Actions polish, Dockerfile/Compose hygiene, .dockerignore, multi-arch buildx, healthchecks, image digest pinning, lint-rule tuning, and README/docs consolidation. Low-tier scope: well-scoped, non-architectural changes. Do not invoke for base-image swaps, audio-pipeline redesign, or vendor-binary debugging."
 name: "CI and Quality"
 model: ["GPT-5 mini (copilot)", "Gemini 2.5 Flash (copilot)", "Claude Haiku 4.5 (copilot)"]
-tools: [read, edit, search, execute]
+tools: [read, edit, search, execute, jq/*, github/*, github-actions/*]
 user-invocable: true
 disable-model-invocation: false
 ---
