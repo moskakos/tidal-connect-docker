@@ -85,24 +85,39 @@ RUN apt-get update -y -q && \
 # every SONAME symlink apt/ldconfig created in the legacy stage.
 COPY --from=legacy /usr/lib/arm-linux-gnueabihf/ /opt/legacy-libs/
 
-# Re-run ldconfig against the target image's copy of the dir so any missing
-# SONAME aliases get recreated (e.g. if COPY skipped a symlink or if a lib
-# was updated between apt install and COPY). -n limits to the named
-# directory and does NOT touch /etc/ld.so.cache — fine because
-# LD_LIBRARY_PATH scans dirs directly without the cache.
-RUN ldconfig -n /opt/legacy-libs && \
-    echo "--- legacy libs staged in /opt/legacy-libs: ---" && \
-    ls /opt/legacy-libs/ | wc -l | xargs -I{} echo "  {} entries" && \
-    echo "--- key SONAMEs: ---" && \
-    ls -l /opt/legacy-libs/libssl.so.1.0.0 \
-          /opt/legacy-libs/libcrypto.so.1.0.0 \
-          /opt/legacy-libs/libcurl.so.4 \
-          /opt/legacy-libs/libavformat.so.57 \
-          /opt/legacy-libs/libavcodec.so.57 \
-          /opt/legacy-libs/libavutil.so.55 \
-          /opt/legacy-libs/libswresample.so.2 \
-          /opt/legacy-libs/libFLAC.so.8 \
-          /opt/legacy-libs/libFLAC++.so.6
+# OpenSSL SONAME compat aliases.
+#
+# Debian 9's libssl1.0.2 package embeds SONAME `libssl.so.1.0.2` in the SO
+# file (verified via `strings libssl.so.1.0.2 | grep '^libssl\.so\.'` on the
+# Debian-9 armhf .deb, 2026-07-01). Same for libcrypto: SONAME
+# `libcrypto.so.1.0.2`. The vendor binary, however, was linked against
+# Debian 8's OpenSSL 1.0.1 which embedded SONAME `libssl.so.1.0.0`. Its
+# DT_NEEDED entries therefore request `libssl.so.1.0.0` / `libcrypto.so.1.0.0`,
+# which no Debian-9 filename or ldconfig-created symlink provides.
+#
+# ABI is still compatible: the Debian-9 libssl.so.1.0.2 exports symbol
+# versions OPENSSL_1.0.0, OPENSSL_1.0.1, and OPENSSL_1.0.2 (backward-
+# compatible within the OpenSSL 1.0.x series). So an explicit symlink from
+# the 1.0.0 SONAME to the 1.0.2 file is safe and lets the loader satisfy
+# the binary's DT_NEEDED lookup.
+RUN cd /opt/legacy-libs && \
+    ln -sf libssl.so.1.0.2    libssl.so.1.0.0 && \
+    ln -sf libcrypto.so.1.0.2 libcrypto.so.1.0.0 && \
+    ldconfig -n /opt/legacy-libs
+
+# Non-failing diagnostic dump. Shows which SONAMEs we ended up with in the
+# final image; every entry that resolves is logged, every missing pattern
+# is silently skipped (|| true). If ldd later reports 'not found', the
+# artifact contains the concrete state of /opt/legacy-libs to diff against.
+RUN echo "--- /opt/legacy-libs entries: $(ls /opt/legacy-libs | wc -l) ---" && \
+    for pattern in \
+        'libssl.so.*'         'libcrypto.so.*'      'libcurl.so.*' \
+        'libavformat.so.*'    'libavcodec.so.*'     'libavutil.so.*' \
+        'libswresample.so.*'  'libFLAC.so.*'        'libFLAC++.so.*'; do \
+        echo "--- $pattern ---"; \
+        # shellcheck disable=SC2086
+        ls -la /opt/legacy-libs/$pattern 2>&1 | head -6 || true; \
+    done
 
 # Copy application binaries and files
 RUN mkdir -p /app/ifi-tidal-release
