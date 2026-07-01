@@ -6,3 +6,10 @@ Docker/.env
 # ground truth for the binary's library requirements.
 artefact-*/
 artifacts/
+
+# Local-only Node.js dev convenience: the jq MCP server (registered in
+# .vscode/mcp.json) lives under node_modules/. Not part of the shipped
+# project — see .vscode/mcp.json comment for reinstall instructions.
+node_modules/
+package.json
+package-lock.json

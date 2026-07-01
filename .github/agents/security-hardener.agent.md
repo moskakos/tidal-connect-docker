@@ -2,7 +2,7 @@
 description: "Use for container security hardening: non-root user, cap_drop, no-new-privileges, read-only root FS, image digest pinning, supply-chain hygiene (image signing, SBOM, Trivy allowlist review). Mid-tier scope: well-known patterns, no architectural rework. Do not invoke for base-image swaps, audio-pipeline redesign, or vendor-binary debugging."
 name: "Security Hardener"
 model: ["GPT-5 (copilot)", "Claude Sonnet 4 (copilot)", "Gemini 2.5 Pro (copilot)"]
-tools: [read, edit, search, execute]
+tools: [read, edit, search, execute, jq/*, github-actions/*]
 user-invocable: true
 disable-model-invocation: false
 ---

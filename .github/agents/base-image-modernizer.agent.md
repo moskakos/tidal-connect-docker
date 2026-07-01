@@ -2,7 +2,7 @@
 description: "Use for attempting to move the tidal-connect container off Debian 9 — trialing Debian 11/12/distroless/Ubuntu bases, diagnosing iFi binary load failures via ldd/strace, and proving (or disproving) library-pin compatibility. High-tier scope: deep reasoning across vendor binary + multi-arch + library SONAMEs. Do not invoke for security hardening, CI polish, or audio-pipeline tuning."
 name: "Base Image Modernizer"
 model: ["Claude Sonnet 4.5 (copilot)", "GPT-5 (copilot)", "Claude Opus 4.7 (copilot)"]
-tools: [read, edit, search, execute]
+tools: [read, edit, search, execute, jq/*, github/*, github-actions/*]
 user-invocable: true
 disable-model-invocation: false
 ---

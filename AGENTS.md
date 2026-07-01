@@ -189,3 +189,47 @@ Open a discussion with the user before:
 - Changing the base image away from Debian-family.
 - Adding new top-level documents.
 - Pushing to remote branches other than the one currently in use.
+
+## 10. Available MCP servers and tool preferences
+
+This workspace has the following MCP servers configured. **Prefer these
+over terminal wrappers** whenever the task fits their scope — MCP calls
+do not require per-command terminal approval and return typed results
+directly.
+
+| MCP server | Scope        | Configured in                          | Prefer over                                                         |
+|------------|--------------|-----------------------------------------|---------------------------------------------------------------------|
+| `jq`             | workspace | [.vscode/mcp.json](.vscode/mcp.json)                                       | shell `jq` piped through the terminal (each `jq` call needs approval) |
+| `github`         | user      | `~/Library/Application Support/Code/User/mcp.json`                         | `gh` CLI (not installed) or `curl` to `api.github.com`                |
+| `github-actions` | user      | `~/Library/Application Support/Code/User/mcp.json`                         | `curl` to Actions API, `gh run …`                                     |
+
+Terminal fallback is fine when the MCP tool is unavailable (e.g. inside
+a subagent that lacks the server in its `tools:` allowlist — see below)
+or when a one-off shell pipeline is genuinely simpler.
+
+### 10.1 Subagent MCP inheritance
+
+Subagents do **NOT** inherit workspace- or user-scope MCP servers by
+default. Verified empirically 2026-06-30: an `Explore` subagent reported
+both `mcp_mcp-jq_*` and `mcp_github_mcp_s2_*` as *"currently disabled"*
+even though the main thread has them.
+
+To grant a subagent access, add the relevant MCP server glob(s) to the
+agent's frontmatter `tools:` list. Per-agent guidance in this repo:
+
+| Agent                       | `tools:` includes                                                    |
+|-----------------------------|----------------------------------------------------------------------|
+| `base-image-modernizer`     | `read, edit, search, execute, jq/*, github/*, github-actions/*`      |
+| `ci-and-quality`            | `read, edit, search, execute, jq/*, github/*, github-actions/*`      |
+| `audio-pipeline-optimizer`  | `read, edit, search, execute, jq/*, github-actions/*`                |
+| `security-hardener`         | `read, edit, search, execute, jq/*, github-actions/*`                |
+
+If a subagent still needs to parse JSON without MCP-jq (e.g. because
+an MCP call failed), fall back to terminal `jq` — it works, it just
+requires user approval per call. Alternative: write the JSON slice to
+disk and let the main thread parse it back on the next turn.
+
+Workspace toolset [`.github/prompts/tidal-connect-docker.toolsets.jsonc`](.github/prompts/tidal-connect-docker.toolsets.jsonc)
+aggregates these globs for main-thread convenience; toolsets do not
+propagate to subagents.
+

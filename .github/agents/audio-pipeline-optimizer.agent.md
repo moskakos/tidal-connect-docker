@@ -2,7 +2,7 @@
 description: "Use when reducing CPU usage of the audio forwarder, prototyping alternatives to ffmpeg (arecord, socat, Snapcast native sources), measuring idle CPU under ARM emulation, or otherwise optimizing the ALSA-loopback → Snapserver audio pipeline. Do not invoke for changes to the TIDAL Connect container itself."
 name: "Audio Pipeline Optimizer"
 model: ["Claude Sonnet 4.5 (copilot)", "GPT-5 (copilot)", "Claude Sonnet 4 (copilot)"]
-tools: [read, edit, search, execute]
+tools: [read, edit, search, execute, jq/*, github-actions/*]
 user-invocable: true
 disable-model-invocation: false
 ---
