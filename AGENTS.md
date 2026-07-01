@@ -27,10 +27,20 @@ Linux. It contains:
 - **Do not delete `tidal-connect/src/id_certificate/`** without an explicit
   user request. Required by the binary at runtime.
 - **Library pins are intentional.** Verified by `ldd` against
-  `tidal_connect_application` in CI (run 28186328355, both `linux/arm/v7`
-  and `linux/arm64` jobs; arm64 host runs the binary under armhf emulation
-  because no aarch64 build exists). The binary loads these SONAMEs from
-  Debian 9 packages — any base-image change must keep them satisfied:
+  `tidal_connect_application` in CI (originally run 28186328355, both
+  `linux/arm/v7` and `linux/arm64` jobs). As of 2026-07-01 the
+  `linux/arm/v7` matrix entry is dropped — the vendor binary is
+  armhf-only and `raspbian/stretch` is an armhf-only image on Docker
+  Hub, so the arm/v7 build produced identical content to the arm64
+  build (both are the armhf image, tagged differently by buildx). The
+  arm64 job exercises the deployment target directly: modern Raspberry
+  Pi hardware (Pi 3B and later, all 64-bit-capable — Pi 3/3B+/3A+/CM3/
+  Zero 2 W/4B/CM4/400/5/500) running 64-bit Raspberry Pi OS + kernel
+  binfmt_misc + qemu-user-static, which is exactly what CI's arm64-host
+  QEMU shim reproduces. Older armv7-only Pi hardware (Pi 2, Pi 1, Pi
+  Zero v1) is not a realistic TIDAL Connect target (insufficient CPU).
+  The binary loads these SONAMEs from Debian 9 packages — any
+  base-image change must keep them satisfied:
   - **OpenSSL 1.0:** `libssl.so.1.0.0`, `libcrypto.so.1.0.0`
     (Debian 8/9 only; Debian 10+ ships 1.1, Debian 12 ships 3.0 — neither
     is binary-compatible; symbol versions `OPENSSL_1.0.0` / `OPENSSL_1.0.1`
