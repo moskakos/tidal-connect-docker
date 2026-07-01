@@ -25,11 +25,11 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-06-30 (BASE-2 in progress — delegated to Base Image Modernizer subagent).
+> Last refresh: 2026-07-01 (BASE-2 validated, ff2a533; production cutover awaits human decision).
 
 ## Active
 
-- 🟡 **BASE-2** — Debian 11 + vendored Debian-9 `.deb`s (approach (a)). Delegated to the **Base Image Modernizer** subagent (AGENTS.md §6 High-tier). Branch: `feat/base-2-debian11-vendored` (subagent will create). Deliverables: working `tidal-connect/Dockerfile.debian11-vendored` + CI matrix extension + runtime smoke probe + license-review note, **or** a documented refutation in [docs/base-image-attempts.md](docs/base-image-attempts.md). Subagent does NOT merge to `dev`.
+_(no active task — pick a `P1` row below and flip its Status to 🟡)_
 
 ## ci-and-quality
 
@@ -61,7 +61,7 @@
 | Status | Pri | ID     | Description                                                                                                                            | Commit |
 |--------|-----|--------|----------------------------------------------------------------------------------------------------------------------------------------|--------|
 | ✅     | P3  | BASE-1 | Approach (c) quick refute: Debian 12 + SONAME symlinks; document negative result in [docs/troubleshooting.md](docs/troubleshooting.md) | 31c7668 |
-| 🟡     | P3  | BASE-2 | Approach (a): Debian 11 + vendored Debian-9 `.deb`s (OpenSSL 1.0, FFmpeg 3, FLAC 8) under `/opt/legacy-libs`; both arches              | —      |
+| ✅     | P3  | BASE-2 | Approach (a): Debian 11 + vendored Debian-9 `.deb`s (OpenSSL 1.0, FFmpeg 3, FLAC 8) under `/opt/legacy-libs`; both arches              | ff2a533 |
 
 ## audio-pipeline-optimizer
 
