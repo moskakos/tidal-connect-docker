@@ -60,21 +60,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Production build (Debian 9 / raspbian/stretch)
-          - platform: linux/arm/v7
-            arch: armv7
-            dockerfile: Dockerfile
-            name: armv7
+          # arm64 is the only CI target: it exercises armhf image content
+          # under arm64-host QEMU emulation, which mirrors how the vendor
+          # binary runs on modern 64-bit Raspberry Pi hosts (Pi 3 and up,
+          # all 64-bit-capable). See AGENTS.md §2 for the armhf-only
+          # vendor-binary constraint and why native armv7 CI adds no signal.
+          # Both production and BASE-2 candidate images are armhf under the
+          # hood (via FROM --platform=linux/arm/v7 in the candidate); the
+          # matrix distinguishes them only by dockerfile.
           - platform: linux/arm64
             arch: arm64
             dockerfile: Dockerfile
             name: arm64
           # BASE-2 candidate (Debian 11 + vendored Debian-9 .debs)
-          - platform: linux/arm/v7
-            arch: armv7
-            dockerfile: Dockerfile.debian11-vendored
-            candidate: debian11-vendored
-            name: armv7-debian11-vendored
           - platform: linux/arm64
             arch: arm64
             dockerfile: Dockerfile.debian11-vendored
