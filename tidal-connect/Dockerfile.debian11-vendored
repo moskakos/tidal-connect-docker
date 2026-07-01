@@ -50,14 +50,30 @@ RUN echo 'deb http://archive.raspberrypi.org/debian/ stretch main' > /etc/apt/so
     sed -i 's/^deb /deb [trusted=yes] /' /etc/apt/sources.list && \
     apt-get -o Acquire::Check-Valid-Until=false update -y -q && \
     apt-get install --no-install-recommends -y -q --allow-unauthenticated \
-        libssl1.0.2 \
-        libcurl3 \
         libavformat57 \
         libavcodec57 \
         libavutil55 \
         libswresample2 \
         libflac8 \
-        libflac++6v5
+        libflac++6v5 \
+        libidn11 \
+        curl
+
+# Override with Debian 8's libssl1.0.0 + libcurl3 — the vendor binary was
+# linked against these specific symbol-versioned builds (OPENSSL_1.0.0,
+# OPENSSL_1.0.1, CURL_OPENSSL_3). Verified 2026-07-01: Debian 9's
+# libssl1.0.2 emits only OPENSSL_1.0.2d / OPENSSL_1.0.2g symbol versions
+# and is therefore not a drop-in for the binary (same failure mode as
+# BASE-1: version tags don't backport). Production Dockerfile has used
+# these exact Debian-8 .debs since day one; reusing them here.
+# hadolint ignore=DL3008
+RUN curl -k -O -L 'https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb' && \
+    apt install -y ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
+    rm ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb
+# hadolint ignore=DL3008
+RUN curl -k -O -L 'https://snapshot.debian.org/archive/debian-security/20190913T112238Z/pool/updates/main/c/curl/libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb' && \
+    apt install -y ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb --allow-downgrades && \
+    rm ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb
 
 # ---- Stage 2: runtime image ----------------------------------------------
 FROM --platform=linux/arm/v7 debian:11-slim
@@ -66,6 +82,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Modern OS packages: SONAMEs stable across Debian 8-12 per AGENTS.md §2,
 # so we install them natively from Debian 11 for security-patched builds.
+# libbsd0 pulled explicitly because libav* transitively need libbsd.so.0
+# and it's not always in --no-install-recommends closure.
 # hadolint ignore=DL3008
 RUN apt-get update -y -q && \
     apt-get install --no-install-recommends -y -q \
@@ -74,36 +92,28 @@ RUN apt-get update -y -q && \
         libasound2 \
         libavahi-client3 \
         libavahi-common3 \
+        libbsd0 \
         avahi-daemon \
         alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Bring the entire Debian-9 armhf lib closure from the legacy stage into
-# /opt/legacy-libs. This includes libavformat57 + libavcodec57 + their ~30
-# transitive codec deps (libx264, libopus, libvorbis, libmp3lame, ...),
-# plus libssl1.0.2, libcrypto1.0.2, libcurl3, libflac8, libflac++6v5 — with
-# every SONAME symlink apt/ldconfig created in the legacy stage.
+# /opt/legacy-libs. This includes:
+# - libavformat57 + libavcodec57 + their ~30 transitive codec deps (libx264,
+#   libopus, libvorbis, libmp3lame, libidn11, ...)
+# - libflac8, libflac++6v5
+# - libssl1.0.0, libcrypto1.0.0 (Debian 8 override, exports OPENSSL_1.0.0/
+#   OPENSSL_1.0.1 symbol versions the vendor binary requires)
+# - libcurl.so.4 (Debian 8 build, exports CURL_OPENSSL_3, links against
+#   libssl.so.1.0.0)
+# plus every SONAME symlink apt/ldconfig created in the legacy stage.
 COPY --from=legacy /usr/lib/arm-linux-gnueabihf/ /opt/legacy-libs/
 
-# OpenSSL SONAME compat aliases.
-#
-# Debian 9's libssl1.0.2 package embeds SONAME `libssl.so.1.0.2` in the SO
-# file (verified via `strings libssl.so.1.0.2 | grep '^libssl\.so\.'` on the
-# Debian-9 armhf .deb, 2026-07-01). Same for libcrypto: SONAME
-# `libcrypto.so.1.0.2`. The vendor binary, however, was linked against
-# Debian 8's OpenSSL 1.0.1 which embedded SONAME `libssl.so.1.0.0`. Its
-# DT_NEEDED entries therefore request `libssl.so.1.0.0` / `libcrypto.so.1.0.0`,
-# which no Debian-9 filename or ldconfig-created symlink provides.
-#
-# ABI is still compatible: the Debian-9 libssl.so.1.0.2 exports symbol
-# versions OPENSSL_1.0.0, OPENSSL_1.0.1, and OPENSSL_1.0.2 (backward-
-# compatible within the OpenSSL 1.0.x series). So an explicit symlink from
-# the 1.0.0 SONAME to the 1.0.2 file is safe and lets the loader satisfy
-# the binary's DT_NEEDED lookup.
-RUN cd /opt/legacy-libs && \
-    ln -sf libssl.so.1.0.2    libssl.so.1.0.0 && \
-    ln -sf libcrypto.so.1.0.2 libcrypto.so.1.0.0 && \
-    ldconfig -n /opt/legacy-libs
+# Re-run ldconfig against the target image's copy of the dir so any missing
+# SONAME aliases get recreated. -n limits to the named directory and does
+# NOT touch /etc/ld.so.cache — fine because LD_LIBRARY_PATH scans dirs
+# directly without the cache.
+RUN ldconfig -n /opt/legacy-libs
 
 # Non-failing diagnostic dump. Shows which SONAMEs we ended up with in the
 # final image; every entry that resolves is logged, every missing pattern
@@ -113,7 +123,8 @@ RUN echo "--- /opt/legacy-libs entries: $(ls /opt/legacy-libs | wc -l) ---" && \
     for pattern in \
         'libssl.so.*'         'libcrypto.so.*'      'libcurl.so.*' \
         'libavformat.so.*'    'libavcodec.so.*'     'libavutil.so.*' \
-        'libswresample.so.*'  'libFLAC.so.*'        'libFLAC++.so.*'; do \
+        'libswresample.so.*'  'libFLAC.so.*'        'libFLAC++.so.*' \
+        'libidn.so.*'         'libbsd.so.*'; do \
         echo "--- $pattern ---"; \
         # shellcheck disable=SC2086
         ls -la /opt/legacy-libs/$pattern 2>&1 | head -6 || true; \
