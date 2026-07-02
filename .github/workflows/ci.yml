@@ -6,6 +6,12 @@ on:
     branches:
       - dev
       - master
+      # BASE-2 candidate branch: pushes here trigger the GHCR publish step
+      # inside build-and-ldd (see 'Login to GHCR' + 'Push candidate to GHCR'
+      # steps). Remove this line once BASE-2 is either promoted to production
+      # (moskakos/tidal-connect Docker Hub tag becomes canonical) or
+      # abandoned. See TODO.md MISC-2.
+      - feat/base-2-debian11-vendored
   workflow_dispatch:
 
 permissions:
@@ -56,6 +62,11 @@ jobs:
     name: Build & ldd (${{ matrix.name }})
     needs: lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # BASE-2: needed to push ghcr.io/moskakos/tidal-connect:base2-candidate
+      # from the GHCR push step below. Scope narrowed to this job only.
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -151,6 +162,45 @@ jobs:
           # will fail to initialize ALSA without /dev/snd, but we only care that
           # it loaded cleanly.
           echo "Smoke probe passed: binary loaded and ran without segfault on ${{ matrix.platform }}"
+
+      - name: Login to GHCR (BASE-2 push)
+        # Only when we're actually about to push the candidate image to GHCR
+        # (see next step for the same condition). github.actor is the pusher,
+        # GITHUB_TOKEN scoped to packages:write per job-level permissions above.
+        if: |
+          matrix.candidate == 'debian11-vendored' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/feat/base-2-debian11-vendored'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push candidate to GHCR (BASE-2 real-world test image)
+        # Publishes the CI-validated candidate image so tidal-dev can pull it
+        # directly (docker-compose.debian11.yml uses this tag), avoiding a
+        # slow armhf QEMU rebuild on the deployment host. Rebuilds use the
+        # gha cache populated by the earlier Build step — near-instant.
+        #
+        # Gated tightly:
+        #  - matrix.candidate == 'debian11-vendored' → only the BASE-2 row
+        #  - github.event_name == 'push' → NOT pull_request (fork PR guard)
+        #  - github.ref == feat/base-2-debian11-vendored → nowhere else
+        #
+        # See TODO.md MISC-2 for the follow-up cleanup task.
+        if: |
+          matrix.candidate == 'debian11-vendored' &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/feat/base-2-debian11-vendored'
+        uses: docker/build-push-action@v5
+        with:
+          context: tidal-connect
+          file: tidal-connect/${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ghcr.io/moskakos/tidal-connect:base2-candidate
+          cache-from: type=gha,scope=${{ matrix.name }}
 
       - name: Trivy scan (tidal-connect:ci-${{ matrix.arch }}-${{ matrix.candidate || 'prod' }})
         # CI-8 (TODO.md): hard-gate. Any HIGH/CRITICAL finding that
