@@ -84,6 +84,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 # so we install them natively from Debian 11 for security-patched builds.
 # libbsd0 pulled explicitly because libav* transitively need libbsd.so.0
 # and it's not always in --no-install-recommends closure.
+#
+# Runtime commands the vendor entrypoint.sh needs (verified 2026-07-02
+# on tidal-dev after first candidate deploy hit 'command not found'):
+#   procps      → pgrep, pkill, ps (Speaker Controller lifecycle mgmt)
+#   tmux        → tmux new-session -d ... speaker_controller_application
+#   dbus        → 'service dbus start' before Avahi initialises
+#   avahi-utils → avahi-browse (soft-fail warning path in entrypoint)
 # hadolint ignore=DL3008
 RUN apt-get update -y -q && \
     apt-get install --no-install-recommends -y -q \
@@ -94,7 +101,11 @@ RUN apt-get update -y -q && \
         libavahi-common3 \
         libbsd0 \
         avahi-daemon \
+        avahi-utils \
         alsa-utils \
+        dbus \
+        procps \
+        tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Bring the entire Debian-9 armhf lib closure from the legacy stage into
