@@ -1,24 +1,29 @@
 # Docker Compose override for BASE-2 candidate testing.
 #
-# Swaps the tidal-connect service to build from the Debian-11 + vendored-
-# Debian-9-libs candidate Dockerfile instead of pulling the production
-# image from Docker Hub. Everything else — forwarder-arecord,
-# forwarder-ffmpeg, network, env, volumes — is inherited from
-# docker-compose.yml.
+# Swaps the tidal-connect service to pull the Debian-11 + vendored-
+# Debian-9-libs candidate image from GHCR instead of the production
+# Docker Hub image. Everything else — forwarder-arecord, forwarder-
+# ffmpeg, network, env, volumes — is inherited from docker-compose.yml.
 #
 # Usage on tidal-dev (or any deployment host with this repo checked out):
 #
-#   # Build + start (uses BASE-2 candidate for tidal-connect):
+#   # Pull the CI-published image + start (~30 s vs. 5-10 min local build):
 #   docker compose -f docker-compose.yml -f docker-compose.debian11.yml \
-#       --profile arecord up -d --build
+#       --profile arecord pull tidal-connect
+#   docker compose -f docker-compose.yml -f docker-compose.debian11.yml \
+#       --profile arecord up -d
 #
-#   # Check tidal-connect image content:
+#   # Check which image is running:
 #   docker inspect tidal-connect --format '{{.Config.Image}}'
-#     -> tidal-connect:base2-candidate
+#     -> ghcr.io/moskakos/tidal-connect:base2-candidate
 #
 #   # Revert to production Docker Hub image — just drop the -f override:
 #   docker compose down
 #   docker compose --profile arecord up -d
+#
+# The image is (re-)published by CI on every push to
+# feat/base-2-debian11-vendored. See .github/workflows/ci.yml
+# ('Push candidate to GHCR' step) and TODO.md MISC-2 (cleanup task).
 #
 # Background: docs/troubleshooting.md § "BASE-2: Debian 11 + vendored
 # Debian-9 libs (validated)" — CI-validated but not yet cut over in
@@ -27,9 +32,9 @@
 
 services:
   tidal-connect:
-    # Locally-tagged image so `docker compose build` does NOT overwrite
-    # or push to the moskakos/tidal-connect Docker Hub tag.
-    image: tidal-connect:base2-candidate
-    build:
-      context: tidal-connect
-      dockerfile: Dockerfile.debian11-vendored
+    # BASE-2 candidate image published by CI to GHCR after every push to
+    # feat/base-2-debian11-vendored. See the 'Push candidate to GHCR' step
+    # in .github/workflows/ci.yml. `docker compose pull` on the deployment
+    # host fetches the latest CI-validated build (~30 s), skipping the
+    # slow QEMU rebuild on tidal-dev (~5-10 min).
+    image: ghcr.io/moskakos/tidal-connect:base2-candidate
