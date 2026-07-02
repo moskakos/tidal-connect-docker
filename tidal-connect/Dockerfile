@@ -26,11 +26,11 @@ RUN apt install --fix-missing --fix-broken -y -q \
     libsoxr0
 
 # Force old libssl & libcurl due to dependency requirements
-RUN curl -fk -O -L https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
+RUN curl -fk --retry 5 --retry-delay 15 --retry-connrefused -O -L https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
     apt install -y ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
     rm ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb
 
-RUN curl -fk -O -L https://snapshot.debian.org/archive/debian-security/20190913T112238Z/pool/updates/main/c/curl/libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb && \
+RUN curl -fk --retry 5 --retry-delay 15 --retry-connrefused -O -L https://snapshot.debian.org/archive/debian-security/20190913T112238Z/pool/updates/main/c/curl/libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb && \
     apt install -y ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb --allow-downgrades && \
     rm ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb
 
