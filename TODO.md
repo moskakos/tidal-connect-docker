@@ -25,7 +25,7 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-07-02 (add MISC-2: GHCR cleanup after BASE-2 outcome).
+> Last refresh: 2026-07-02 (BASE-2 candidate deployed + verified on tidal-dev; add MISC-3: TIDAL quality investigation).
 
 ## Active
 
@@ -79,3 +79,4 @@ _(no active task — pick a `P1` row below and flip its Status to 🟡)_
 |--------|-----|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|
 | 🔴     | P3  | MISC-1 | Full Tier-3 byte-flow smoke (`arecord → socat`) on self-hosted Proxmox runner with generic-kernel `snd-aloop`. Background: [/memories/repo/github-runner-no-snd-aloop.md](/memories/repo/github-runner-no-snd-aloop.md) | —      |
 | 🔴     | P3  | MISC-2 | GHCR cleanup: delete `ghcr.io/moskakos/tidal-connect:base2-candidate` once BASE-2 is either promoted to production (image gets a canonical tag) or abandoned. Introduced by the CI push step for BASE-2 real-world testing on tidal-dev.                    | —      |
+| 🔴     | P3  | MISC-3 | Investigate TIDAL app stream-quality downgrade: casting to `tidal_connect_application` yields "Low 320 kbps" in the app even when Settings → Quality is set to "Max (up to 24-bit / 192 kHz)". AGENTS.md §8 already notes the binary tops out at TIDAL High (16-bit / 44.1 kHz FLAC ≈ 1411 kbps); 320 kbps is *below* documented High, so either the binary is advertising a narrower capability than expected, or the app's negotiation is misreading the mDNS TXT / websocket handshake. Approach: capture the mDNS TXT records + websocket handshake against the binary and compare with what the app expects; check `TC_*` env vars for undocumented quality knobs. If irreducible: document in AGENTS.md §8 and close. | —      |
