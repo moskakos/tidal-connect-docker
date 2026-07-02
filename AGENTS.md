@@ -137,13 +137,20 @@ Linux. It contains:
 |------|-------|------|
 | Static | GitHub Actions | hadolint, shellcheck, yamllint, `docker compose config` |
 | Build | GitHub Actions | `docker buildx` multi-arch, Trivy scan, smoke test (container starts, binary stays alive 30 s) |
-| Synthetic E2E | GitHub Actions | `modprobe snd-aloop`, mock Snapserver TCP listener, validate byte flow + JSON-RPC calls |
-| Performance | Self-hosted runner in Proxmox VM | Idle CPU under ARM emulation; only this environment reproduces the user's hardware |
+| Synthetic E2E | GitHub Actions | Mock Snapserver TCP listener, validate JSON-RPC `AddStream`/`RemoveStream` + entrypoint EXIT trap. Full byte-flow (`arecord → socat`) requires `snd-aloop` and is currently deferred to a self-hosted runner (MISC-1). |
+| Performance | Self-hosted runner in Proxmox VM (`tidal-dev`) | Idle CPU under ARM emulation; only this environment reproduces the user's hardware |
 | Manual smoke | User's phone | Real TIDAL app discovers device and plays audio; release-gate only |
 
-Performance baselines live in `docs/performance-baseline.md` (to be created).
-Always measure before/after on the same host when proposing CPU
-optimizations.
+Performance baselines live in `docs/performance-baseline.md`. Always
+measure before/after on the same host when proposing CPU optimizations.
+
+The self-hosted runner service (`actions.runner.moskakos-tidal-connect-docker.tidal-dev.service`)
+is **disabled at boot** and controlled on demand — agents SSH'ing to
+`tidal-dev` as `moska` have a scoped `sudoers.d` rule allowing
+`systemctl start|stop|restart|status|is-active|show` without a password.
+See [/memories/repo/tidal-dev-runner.md](/memories/repo/tidal-dev-runner.md)
+for the full workflow, security posture, and the required fork-PR guard
+that every self-hosted job MUST carry.
 
 ## 6. Agent / model selection policy
 
