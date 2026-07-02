@@ -142,6 +142,21 @@ jobs:
     # for the verification. End-to-end audio is exercised manually on
     # the real hardware and could be added later on a self-hosted
     # runner that uses a generic kernel.
+    #
+    # SECURITY REMINDER for anyone adding that self-hosted byte-flow
+    # job (MISC-1): this is a public repo, so any self-hosted job MUST
+    # carry the fork-PR guard. Copy verbatim:
+    #
+    #   smoke-byteflow:
+    #     if: |
+    #       github.event_name != 'pull_request' ||
+    #       github.event.pull_request.head.repo.full_name == github.repository
+    #     runs-on: [self-hosted, tidal-dev]
+    #     ...
+    #
+    # Without that `if:` a fork PR's malicious workflow modification
+    # would execute on `tidal-dev`. See /memories/repo/tidal-dev-runner.md
+    # for the full runner security posture.
     name: Smoke test (forwarder-arecord)
     needs: lint
     runs-on: ubuntu-latest
