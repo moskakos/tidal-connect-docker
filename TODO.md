@@ -25,7 +25,7 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-07-01 (BASE-2 validated, ff2a533; production cutover awaits human decision).
+> Last refresh: 2026-07-02 (add MISC-2: GHCR cleanup after BASE-2 outcome).
 
 ## Active
 
@@ -78,3 +78,4 @@ _(no active task — pick a `P1` row below and flip its Status to 🟡)_
 | Status | Pri | ID     | Description                                                                                                                                                                                                            | Commit |
 |--------|-----|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------|
 | 🔴     | P3  | MISC-1 | Full Tier-3 byte-flow smoke (`arecord → socat`) on self-hosted Proxmox runner with generic-kernel `snd-aloop`. Background: [/memories/repo/github-runner-no-snd-aloop.md](/memories/repo/github-runner-no-snd-aloop.md) | —      |
+| 🔴     | P3  | MISC-2 | GHCR cleanup: delete `ghcr.io/moskakos/tidal-connect:base2-candidate` once BASE-2 is either promoted to production (image gets a canonical tag) or abandoned. Introduced by the CI push step for BASE-2 real-world testing on tidal-dev.                    | —      |
