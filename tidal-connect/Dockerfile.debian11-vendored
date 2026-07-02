@@ -1,0 +1,188 @@
+# ============================================================================
+# BASE-2 candidate (approach E) — multi-stage build.
+#
+# Stage 1 (legacy): raspbian/stretch — Debian 9 with its native package
+# archive. Install the vendor-binary's link-time deps via apt (which resolves
+# the full transitive closure including all FFmpeg codec libs like libx264,
+# libopus, libvorbis, etc.). Copy the resulting /usr/lib/arm-linux-gnueabihf/
+# to /opt/legacy-libs in stage 2.
+#
+# Stage 2 (runtime): debian:11-slim — modern Debian, modern glibc/coreutils/
+# apt/security posture. Install stable-across-releases packages (portaudio,
+# alsa, avahi) natively. Bring in the Debian-9 legacy libs from stage 1.
+# ldconfig creates SONAME symlinks. LD_LIBRARY_PATH points the loader.
+#
+# Rationale for multi-stage vs. snapshot.debian.org URLs (superseded on
+# 2026-07-01, previous attempts documented in git history: bf40068, da5d302,
+# b6fb856):
+# - No per-URL archaeology for ~30 transitive codec libs
+# - apt automatically resolves the correct SONAME symlinks
+# - Same trust chain as the production Dockerfile (raspbian/stretch)
+# - Debian-9 libs shipped in the final image are limited to /opt/legacy-libs
+#
+# Platform pin: both stages use FROM --platform=linux/arm/v7 because the
+# vendor binary is armhf-only (AGENTS.md §2). CI's linux/arm64 matrix entry
+# runs the resulting armhf image under arm64-host QEMU emulation, mirroring
+# modern 64-bit Raspberry Pi hosts (Pi 3 and up, all 64-bit-capable).
+#
+# License review: All packages pulled here are the same Debian-9 binaries
+# that raspbian/stretch would install natively. SPDX licenses are all
+# redistributable with attribution:
+#   - libssl1.0.2:  OpenSSL License (BSD-style)
+#   - libcurl3:     curl License (MIT-style)
+#   - libav*:       LGPL-2.1+ (standard Debian FFmpeg 3 build)
+#   - libflac*:     BSD-3-Clause / Xiph.Org
+#   - Transitive codec deps (libx264, libopus, libvorbis, libmp3lame, ...):
+#     mix of LGPL-2.1+, BSD-style, MIT — all redistributable
+# See tidal-connect/src/licenses/ for the vendor-binary's own dependency
+# notices.
+# ============================================================================
+
+# ---- Stage 1: legacy library harvest --------------------------------------
+FROM --platform=linux/arm/v7 raspbian/stretch AS legacy
+
+# Same sources.list dance as the production Dockerfile:
+# legacy.raspbian.org is the only source that still serves Debian 9 armhf
+# packages after Debian's stretch support ended.
+# hadolint ignore=DL3008,DL3009,DL3015
+RUN echo 'deb http://archive.raspberrypi.org/debian/ stretch main' > /etc/apt/sources.list && \
+    echo 'deb http://legacy.raspbian.org/raspbian stretch main contrib non-free rpi firmware' >> /etc/apt/sources.list && \
+    sed -i 's/^deb /deb [trusted=yes] /' /etc/apt/sources.list && \
+    apt-get -o Acquire::Check-Valid-Until=false update -y -q && \
+    apt-get install --no-install-recommends -y -q --allow-unauthenticated \
+        libavformat57 \
+        libavcodec57 \
+        libavutil55 \
+        libswresample2 \
+        libflac8 \
+        libflac++6v5 \
+        libidn11 \
+        curl
+
+# Override with Debian 8's libssl1.0.0 + libcurl3 — the vendor binary was
+# linked against these specific symbol-versioned builds (OPENSSL_1.0.0,
+# OPENSSL_1.0.1, CURL_OPENSSL_3). Verified 2026-07-01: Debian 9's
+# libssl1.0.2 emits only OPENSSL_1.0.2d / OPENSSL_1.0.2g symbol versions
+# and is therefore not a drop-in for the binary (same failure mode as
+# BASE-1: version tags don't backport). Production Dockerfile has used
+# these exact Debian-8 .debs since day one; reusing them here.
+# hadolint ignore=DL3008
+RUN curl -k -O -L 'https://snapshot.debian.org/archive/debian-security/20190925T215334Z/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb' && \
+    apt install -y ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb && \
+    rm ./libssl1.0.0_1.0.1t-1%2Bdeb8u12_armhf.deb
+# hadolint ignore=DL3008
+RUN curl -k -O -L 'https://snapshot.debian.org/archive/debian-security/20190913T112238Z/pool/updates/main/c/curl/libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb' && \
+    apt install -y ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb --allow-downgrades && \
+    rm ./libcurl3_7.38.0-4%2Bdeb8u16_armhf.deb
+
+# ---- Stage 2: runtime image ----------------------------------------------
+FROM --platform=linux/arm/v7 debian:11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Modern OS packages: SONAMEs stable across Debian 8-12 per AGENTS.md §2,
+# so we install them natively from Debian 11 for security-patched builds.
+# libbsd0 pulled explicitly because libav* transitively need libbsd.so.0
+# and it's not always in --no-install-recommends closure.
+# hadolint ignore=DL3008
+RUN apt-get update -y -q && \
+    apt-get install --no-install-recommends -y -q \
+        ca-certificates \
+        libportaudio2 \
+        libasound2 \
+        libavahi-client3 \
+        libavahi-common3 \
+        libbsd0 \
+        avahi-daemon \
+        alsa-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Bring the entire Debian-9 armhf lib closure from the legacy stage into
+# /opt/legacy-libs. This includes:
+# - libavformat57 + libavcodec57 + their ~30 transitive codec deps (libx264,
+#   libopus, libvorbis, libmp3lame, ...)
+# - libflac8, libflac++6v5
+# - libssl1.0.0, libcrypto1.0.0 (Debian 8 override, exports OPENSSL_1.0.0/
+#   OPENSSL_1.0.1 symbol versions the vendor binary requires)
+# - libcurl.so.4 (Debian 8 build, exports CURL_OPENSSL_3, links against
+#   libssl.so.1.0.0)
+# plus every SONAME symlink apt/ldconfig created in the legacy stage.
+#
+# Note: Debian 9 pre-usrmerge — some libs live in /lib/arm-linux-gnueabihf/
+# rather than /usr/lib/arm-linux-gnueabihf/ (e.g. libidn11). Copy both
+# directories; contents are disjoint on Debian 9 so no overwrite conflict.
+COPY --from=legacy /usr/lib/arm-linux-gnueabihf/ /opt/legacy-libs/
+COPY --from=legacy /lib/arm-linux-gnueabihf/     /opt/legacy-libs/
+
+# CRITICAL: prune Debian-9 glibc family from /opt/legacy-libs.
+#
+# The /lib/arm-linux-gnueabihf/ copy above brings Debian 9's libc.so.6
+# (glibc 2.24) into /opt/legacy-libs. Because ENV LD_LIBRARY_PATH points
+# there, EVERY binary in the runtime image — including /bin/sh, chmod,
+# ls — would then load Debian 9's glibc first. Debian 11's binaries need
+# GLIBC_2.28+ symbol versions that Debian 9's libc.so.6 does not export,
+# so the container breaks at the next RUN step (verified 25afdfc CI:
+# "/bin/sh: /opt/legacy-libs/libc.so.6: version `GLIBC_2.28' not found").
+#
+# Solution: delete the glibc-owned files from /opt/legacy-libs. Debian 11
+# ships them at /lib/arm-linux-gnueabihf/ (glibc 2.31) which the loader
+# reaches via ld.so's default paths after LD_LIBRARY_PATH scan. glibc is
+# forward-compatible by design (2.31 exports every 2.24 symbol), so the
+# Debian-9 SOs we keep in /opt/legacy-libs still resolve their libc deps
+# correctly against Debian 11's glibc.
+RUN cd /opt/legacy-libs && \
+    rm -f libc.so.*         libc-*.so \
+          libpthread.so.*   libpthread-*.so \
+          libdl.so.*        libdl-*.so \
+          libm.so.*         libm-*.so \
+          librt.so.*        librt-*.so \
+          libresolv.so.*    libresolv-*.so \
+          libcrypt.so.*     libcrypt-*.so \
+          libnss_*.so.*     libnss_*-*.so \
+          libanl.so.*       libanl-*.so \
+          libutil.so.*      libutil-*.so \
+          libnsl.so.*       libnsl-*.so \
+          libBrokenLocale.so.*             libBrokenLocale-*.so \
+          libthread_db.so.* libthread_db-*.so \
+          ld-linux-*.so.*   ld-*.so && \
+    ldconfig -n /opt/legacy-libs
+
+# Non-failing diagnostic dump. Shows which SONAMEs we ended up with in the
+# final image; every entry that resolves is logged, every missing pattern
+# is silently skipped (|| true). If ldd later reports 'not found', the
+# artifact contains the concrete state of /opt/legacy-libs to diff against.
+RUN echo "--- /opt/legacy-libs entries: $(ls /opt/legacy-libs | wc -l) ---" && \
+    for pattern in \
+        'libssl.so.*'         'libcrypto.so.*'      'libcurl.so.*' \
+        'libavformat.so.*'    'libavcodec.so.*'     'libavutil.so.*' \
+        'libswresample.so.*'  'libFLAC.so.*'        'libFLAC++.so.*' \
+        'libidn.so.*'         'libbsd.so.*'; do \
+        echo "--- $pattern ---"; \
+        # shellcheck disable=SC2086
+        ls -la /opt/legacy-libs/$pattern 2>&1 | head -6 || true; \
+    done
+
+# Copy application binaries and files
+RUN mkdir -p /app/ifi-tidal-release
+WORKDIR /app/ifi-tidal-release
+
+COPY src/bin/ bin
+COPY src/pa_devs/ .
+COPY src/play .
+COPY src/id_certificate id_certificate
+COPY src/licenses licenses
+RUN chmod a+x bin/*
+
+# Runtime env
+ENV PA_ALSA_PLUGHW=1
+# Prepend /opt/legacy-libs so the dynamic loader finds Debian-9 SONAMEs
+# first; transitively-loaded system libs (libc, libpthread, libavahi-*)
+# still resolve from /usr/lib/arm-linux-gnueabihf via ld.so's default paths.
+ENV LD_LIBRARY_PATH=/opt/legacy-libs
+
+# Entrypoint (unchanged from production)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []
