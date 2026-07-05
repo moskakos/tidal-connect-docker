@@ -54,7 +54,7 @@ Before any change, load:
 - **Soft note: if a change touches the forwarder entrypoint, also touch
   the matching env-var defaults / comments in `docker-compose.yml`** —
   this is called out in
-  [.github/instructions/ffmpeg.instructions.md](../instructions/ffmpeg.instructions.md).
+  [.github/instructions/forwarder.instructions.md](../instructions/forwarder.instructions.md).
 
 ## Known CI gaps (as of 2026-06-26)
 
@@ -143,8 +143,8 @@ In order of expected payoff, not size:
    `forwarder-arecord/` benefit from tighter ignore lists — vendor
    license trees should not enter `tidal-connect/`'s build context;
    ensure they don't.
-4. **Pin third-party images by digest.** `linuxserver/ffmpeg` and any
-   base used by `forwarder-arecord/Dockerfile`. Use `@sha256:...`.
+4. **Pin third-party images by digest.** The base used by
+   `forwarder-arecord/Dockerfile`. Use `@sha256:...`.
    Vendor `tidal-connect/Dockerfile`'s base (Debian 9) is locked by
    the binary's library needs — confirm it's pinned by digest too.
 5. **Healthcheck for `tidal-forwarder-arecord`.** Lightweight:

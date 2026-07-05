@@ -38,7 +38,7 @@ Before any change, load:
    security knobs are applied here.
 6. [.github/instructions/tidal-connect.instructions.md](../instructions/tidal-connect.instructions.md)
    and
-   [.github/instructions/ffmpeg.instructions.md](../instructions/ffmpeg.instructions.md)
+   [.github/instructions/forwarder.instructions.md](../instructions/forwarder.instructions.md)
    — per-service rules.
 
 ## Hard constraints
@@ -101,9 +101,9 @@ invocation.
    `tidal_connect_application` is **harder** — try only after #1 and
    #2 succeed.
 4. **Pin third-party images by digest.** Update Dockerfiles to use
-   `FROM debian:9@sha256:...` and `FROM linuxserver/ffmpeg:latest@sha256:...`
-   form. Document the pinning decision in a comment line above each
-   `FROM`.
+   `FROM debian:9@sha256:...` form for `tidal-connect/Dockerfile`, and
+   the corresponding base for `forwarder-arecord/Dockerfile`. Document
+   the pinning decision in a comment line above each `FROM`.
 5. **Add `read_only: true` to `forwarder-arecord`** in
    docker-compose.yml, with `tmpfs: [/tmp]` for whatever scratch space
    it needs. `tidal-connect` is unlikely to tolerate read-only — try

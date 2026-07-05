@@ -2,16 +2,16 @@
 #
 # Swaps the tidal-connect service to pull the Debian-11 + vendored-
 # Debian-9-libs candidate image from GHCR instead of the production
-# Docker Hub image. Everything else — forwarder-arecord, forwarder-
-# ffmpeg, network, env, volumes — is inherited from docker-compose.yml.
+# Docker Hub image. Everything else — forwarder-arecord, network, env,
+# volumes — is inherited from docker-compose.yml.
 #
 # Usage on tidal-dev (or any deployment host with this repo checked out):
 #
 #   # Pull the CI-published image + start (~30 s vs. 5-10 min local build):
 #   docker compose -f docker-compose.yml -f docker-compose.debian11.yml \
-#       --profile arecord pull tidal-connect
+#       pull tidal-connect
 #   docker compose -f docker-compose.yml -f docker-compose.debian11.yml \
-#       --profile arecord up -d
+#       up -d
 #
 #   # Check which image is running:
 #   docker inspect tidal-connect --format '{{.Config.Image}}'
@@ -19,7 +19,7 @@
 #
 #   # Revert to production Docker Hub image — just drop the -f override:
 #   docker compose down
-#   docker compose --profile arecord up -d
+#   docker compose up -d
 #
 # The image is (re-)published by CI on every push to
 # feat/base-2-debian11-vendored. See .github/workflows/ci.yml

@@ -23,52 +23,11 @@ services:
       - /dev/shm:/dev/shm
       - /etc/timezone:/etc/timezone:ro
 
-  tidal-forwarder:
-    image: linuxserver/ffmpeg:latest
-    container_name: tidal-forwarder
-    profiles:
-      - ffmpeg
-    depends_on:
-      - tidal-connect
-    restart: always
-    security_opt:
-      - "no-new-privileges:true"
-    cap_drop:
-      - ALL
-    network_mode: host
-    devices:
-      - /dev/snd
-    environment:
-      - SNAPSERVER_HOST=snapcast
-      - SNAPSERVER_API_PORT=1780
-      - STREAM_PORT=5000
-      - STREAM_NAME=Tidal
-      # Audio format for FFmpeg, e.g. flac or s16le for PCM
-      - FFMPEG_AUDIO_FORMAT=s16le
-      # Audio codec for FFmpeg, e.g. flac or pcm_s16le for PCM
-      - FFMPEG_AUDIO_CODEC=pcm_s16le
-      # Audio codec for Snapcast stream, e.g. flac or pcm
-      # See https://github.com/badaix/snapcast/blob/develop/doc/configuration.md
-      - SC_AUDIO_CODEC=pcm
-      - AUDIO_DEVICE=plughw:Loopback,0
-      - SAMPLE_RATE=44100
-      - CHANNELS=2
-      - BUFFER_SIZE=1024
-      - AUDIO_BUFFER=2048
-      - FLAC_COMPRESSION_LEVEL=8
-    volumes:
-      - /dev/shm:/dev/shm
-      - /etc/timezone:/etc/timezone:ro
-      - ./ffmpeg/entrypoint.sh:/entrypoint.sh:ro
-    entrypoint: /bin/bash /entrypoint.sh
-
   tidal-forwarder-arecord:
     build:
       context: forwarder-arecord
       dockerfile: Dockerfile
     container_name: tidal-forwarder-arecord
-    profiles:
-      - arecord
     depends_on:
       - tidal-connect
     restart: always
