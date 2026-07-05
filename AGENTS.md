@@ -10,9 +10,10 @@ Linux. It contains:
 
 - `tidal-connect/` — Dockerfile + entrypoint that runs a closed-source iFi
   Audio binary (`tidal_connect_application`) on Raspbian/Debian 9.
-- `ffmpeg/` — entrypoint script that runs in `linuxserver/ffmpeg`, reads from
-  an ALSA loopback device, registers a stream with Snapserver via JSON-RPC,
-  and forwards audio over TCP.
+- `forwarder-arecord/` — minimal `arecord`+`socat` audio forwarder that reads
+  from the ALSA loopback device, registers a stream with Snapserver via
+  JSON-RPC, and forwards raw PCM over TCP. Sole forwarder since the old
+  ffmpeg-based one was removed.
 - `docker-compose.yml` — wires the two services together with `network_mode:
   host`.
 
@@ -160,7 +161,7 @@ debugging-by-inspection. Tiering guidance:
 
 | Tier | Use for | Examples (subject to availability) |
 |------|---------|------------------------------------|
-| **High** (premium reasoning) | Base-image modernization, ALSA / ffmpeg / Snapcast pipeline redesign, library compatibility debugging, complex multi-step refactors | Claude Sonnet 4.5, GPT-5, top-tier reasoning models |
+| **High** (premium reasoning) | Base-image modernization, ALSA / forwarder / Snapcast pipeline redesign, library compatibility debugging, complex multi-step refactors | Claude Sonnet 4.5, GPT-5, top-tier reasoning models |
 | **Mid** (balanced) | Security hardening (well-known patterns), Dockerfile review, shell-script refactors | GPT-5 mini, Claude Haiku (4.x), Gemini 2.5 Pro |
 | **Low** (fast / cheap) | CI YAML scaffolding, lint-rule fixes, doc edits, file-name search, README cleanup | GPT-5 nano, Gemini Flash, similar small models |
 | **Explore subagent** | Read-only codebase Q&A, file location, pattern search | Fast/cheap tier; never high tier |
@@ -182,7 +183,7 @@ created. Current plan (not yet implemented):
 |-------|------|-------|
 | `base-image-modernizer` | High | Try Debian 11 / 12 / distroless; diagnose binary load failures via `ldd` / `strace`; keep ARM constraints intact. |
 | `security-hardener` | Mid | Non-root user, `cap_drop`, `no-new-privileges`, digest pinning, supply-chain hygiene. |
-| `audio-pipeline-optimizer` | High | Replace ffmpeg with `arecord`+`socat` or Snapcast native sources; measure idle CPU before/after. Must not touch the TIDAL binary container. |
+| `audio-pipeline-optimizer` | High | Maintain and tune the `arecord`+`socat` forwarder (idle CPU, ALSA quirks, Snapserver JSON-RPC lifecycle). Must not touch the TIDAL binary container. |
 | `ci-and-quality` | Low | GitHub Actions, `.dockerignore`, healthchecks, multi-arch buildx, README consolidation. |
 
 Spawn at most one of these at a time; they share Dockerfile / Compose
@@ -190,10 +191,11 @@ surface and conflict easily.
 
 ## 8. Known issues to keep in mind
 
-- Idle CPU under x86-host + ARM-emulated Proxmox VM: ~33 % per 2 vCPU. The
-  audio-pipeline-optimizer's primary target.
-- FLAC encoding in ffmpeg has caused audio dropouts → PCM is the safe
-  default.
+- Idle CPU under x86-host + ARM-emulated Proxmox VM: ~1.4 % (median) with
+  the `arecord`+`socat` forwarder. Historical `ffmpeg` forwarder measured
+  ~21.6 % on the same host — the ~15× gap was the reason for the switch
+  and, ultimately, the removal of the ffmpeg forwarder. See
+  [docs/performance-baseline.md](docs/performance-baseline.md).
 - `tidal_connect_application` accepts at most TIDAL *High* quality
   (16-bit/44.1 kHz), not *Max*.
 - `TC_DISABLE_APP_SEC=false` is documented as not working; do not assume it

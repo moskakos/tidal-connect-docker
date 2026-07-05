@@ -1,16 +1,19 @@
 ---
-description: "Constraints and conventions for the audio forwarder (ffmpeg / Snapcast bridge). Apply when editing anything under ffmpeg/ or alternative forwarder implementations."
-applyTo: "ffmpeg/**,forwarder-*/**"
+description: "Constraints and conventions for the audio forwarder (arecord+socat / Snapserver bridge). Apply when editing anything under forwarder-*/."
+applyTo: "forwarder-*/**"
 ---
 
 # Audio forwarder — agent instructions
 
 ## What this container does
 
-Reads PCM audio from an ALSA loopback capture device, registers a stream
-with Snapserver via JSON-RPC, and forwards the audio over TCP to that
-stream. Currently implemented with `linuxserver/ffmpeg`; alternative
-lower-CPU implementations are an active area of development.
+Reads PCM audio from an ALSA loopback capture device with `arecord`,
+registers a stream with Snapserver via JSON-RPC, and forwards the raw
+PCM to that stream over TCP with `socat`. This is the sole forwarder
+shipped in this repo. A historical `ffmpeg`-based implementation was
+removed because its idle CPU on ARM-emulated hosts was ~15× higher
+(see [docs/performance-baseline.md](../../docs/performance-baseline.md))
+and it offered no functionality the current setup needs.
 
 ## Hard rules
 
@@ -22,38 +25,27 @@ lower-CPU implementations are an active area of development.
 2. **Sample format, rate, and channel count sent in `Stream.AddStream` must
    exactly match what the forwarder actually transmits.** Mismatches cause
    silent corruption or noise.
-3. **Default codec is PCM** (`s16le` / `pcm_s16le` on the ffmpeg side, `pcm`
-   on the Snapcast side). FLAC has caused dropouts in this setup; do not
-   change the default.
+3. **Codec is PCM only** (`s16le` on the ALSA side, `pcm` on the Snapcast
+   side). FLAC caused dropouts in the old ffmpeg forwarder; the arecord
+   pipeline has no re-encoding step and PCM is the only sensible output.
 4. **The forwarder must reach Snapserver over the network defined in
-   `docker-compose.yml`.** Currently `network_mode: host`. New forwarder
-   implementations must work with this networking model.
+   `docker-compose.yml`.** Currently `network_mode: host`. Any
+   architectural change must work with this networking model.
 
-## Performance constraints (important)
+## Performance constraint
 
-When this container runs in an ARM-emulated VM on an x86 host, ffmpeg's
-ALSA capture + resampling loop currently consumes ~33 % of 2 vCPUs **even
-at idle** (no audio playing). This is the primary motivation for
-considering alternative implementations:
-
-- `arecord | socat TCP:...` — minimal CPU, no resampling, no codec wrapping
-- Snapcast `process://` or `pipe://` source — only spawns the reader when a
-  client is actively listening
-- Snapcast native ALSA source — eliminates this container entirely if
-  Snapserver runs on the same host
-
-Any alternative implementation **must** be measured against the current
-ffmpeg implementation on the same host before claiming improvement. Record
-results in `docs/performance-baseline.md`.
+Idle CPU on the reference host (x86 + ARM-emulated Proxmox VM, 2 vCPU)
+is ~1.4 % median with the current pipeline. Regressions above ~5 %
+require investigation before merging. Always compare on the same host;
+results live in [docs/performance-baseline.md](../../docs/performance-baseline.md).
 
 ## Entrypoint conventions
 
-When editing `ffmpeg/entrypoint.sh` (or writing a new forwarder
-entrypoint):
+When editing `forwarder-arecord/entrypoint.sh`:
 
 - Use the existing `info` / `warning` / `error` / `remove_stream` /
-  `cleanup` helpers. Copy the pattern verbatim for new implementations.
-- `trap cleanup SIGTERM SIGINT` is mandatory.
+  `cleanup` helpers.
+- `trap cleanup SIGTERM SIGINT EXIT` is mandatory.
 - Background the audio process (`&`), capture PID, `wait $PID`, then fall
   through to `cleanup`. This pattern lets signal handlers run promptly.
 - All env-var defaults live at the top of the script in one block. Do not
@@ -61,9 +53,7 @@ entrypoint):
 
 ## ALSA buffering knobs
 
-If a forwarder exposes `PERIOD_TIME` / `BUFFER_TIME` (or analogous
-`PERIOD_SIZE` / `BUFFER_SIZE`) env vars, the two values **must be edited
-in sync**:
+`PERIOD_TIME` / `BUFFER_TIME` env vars **must be edited in sync**:
 
 - `BUFFER_TIME` must be a small integer multiple of `PERIOD_TIME`
   (typically 2..8). ALSA silently rounds otherwise.
@@ -93,8 +83,9 @@ the JSON, log the result code) is a welcome enhancement.
 
 ## Anti-patterns
 
-- Do **not** add transcoding or quality-altering filters by default. The
-  forwarder's job is to move bytes, not to "improve" the audio.
+- Do **not** add transcoding or quality-altering filters. The forwarder's
+  job is to move bytes, not to "improve" the audio. If someone proposes
+  re-adding ffmpeg, point them at the performance baseline.
 - Do **not** introduce a persistent connection to Snapserver's WebSocket
   API just to register a stream — JSON-RPC over HTTP is sufficient and
   matches existing convention.
