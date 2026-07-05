@@ -50,17 +50,10 @@ All three services declare `security_opt: ["no-new-privileges:true"]` in
   expects the default Linux capability set. Dropping capabilities here
   has been observed to break discovery; not changed.
 
-### 2.2 `tidal-forwarder` (ffmpeg, legacy profile)
+### 2.2 `tidal-forwarder-arecord` (Alpine 3.20, sole forwarder)
 
-- **`cap_drop: [ALL]`** — runs with no Linux capabilities.
-- **`no-new-privileges:true`** — set-uid binaries cannot elevate.
-- Still runs as root inside the container (the upstream
-  `linuxserver/ffmpeg` image default). Acceptable because all capabilities
-  are dropped.
-
-### 2.3 `tidal-forwarder-arecord` (Alpine 3.20, recommended)
-
-The most-hardened service:
+The most-hardened service and the only forwarder shipped since the
+ffmpeg-based `tidal-forwarder` was removed:
 
 - **Non-root user** (`uid=1001`, `gid=29`). The `audio-host` group at
   GID 29 matches the Debian host's `audio` group so the bind-mounted
@@ -99,7 +92,7 @@ AGENTS.md section 2). Consequences:
 | Control | Where | What it catches |
 |--|--|--|
 | Multi-arch buildx (`linux/arm/v7` + `linux/arm64`) | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) `build-and-ldd` matrix | Build regressions on either ARM variant. |
-| Base image digest pinning (`@sha256:...`) | [`forwarder-arecord/Dockerfile`](../forwarder-arecord/Dockerfile), [`docker-compose.yml`](../docker-compose.yml) `linuxserver/ffmpeg` | Image-tag squatting, base-image tampering. |
+| Base image digest pinning (`@sha256:...`) | [`forwarder-arecord/Dockerfile`](../forwarder-arecord/Dockerfile) | Image-tag squatting, base-image tampering. |
 | `ldd` verification on every CI build | `build-and-ldd` job | Silent base-image drift that would break the vendor binary's library closure. |
 | Trivy `image` scan (HIGH,CRITICAL) | `build-and-ldd` and `smoke-arecord` jobs | Known-CVE packages in either image. |
 | Trivy hard-gate (`exit-code: 1`) | Same | A new fixable HIGH/CRITICAL not already justified blocks the build. |
@@ -178,9 +171,6 @@ Before exposing this stack on a network:
 - [ ] Snapserver is **v0.35.0 or newer** (see AGENTS.md section 8 known
       issues — older versions reproduced `Address already in use` on
       forwarder restart).
-- [ ] Use the `arecord` forwarder profile (`docker compose --profile
-      arecord up`) for new deployments; the `ffmpeg` profile is kept
-      for backward compatibility but is the less-hardened of the two.
 - [ ] Confirm the host `audio` group is GID 29 (Debian default). If
       not, the bind-mounted `/dev/snd` nodes will not be readable by
       `uid 1001 / gid 29` inside the arecord forwarder.
@@ -195,8 +185,6 @@ Before exposing this stack on a network:
     update the `@sha256:...` line in
     [`forwarder-arecord/Dockerfile`](../forwarder-arecord/Dockerfile),
     let CI verify.
-  - Bump `linuxserver/ffmpeg` digest the same way (current pin is in
-    [`docker-compose.yml`](../docker-compose.yml)).
   - When Trivy reports a new HIGH/CRITICAL on a future scan, CI fails
     closed. Either fix it (preferred — bump base) or add a justified
     entry to [`.trivyignore`](../.trivyignore) with a comment block
