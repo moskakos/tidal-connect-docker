@@ -43,6 +43,7 @@ _(no active task — pick a `P1` row below and flip its Status to 🟡)_
 | ✅     |     | CI-6 | Trivy scan job + `.trivyignore`                                          | 7586ff7 |
 | ✅     |     | CI-7 | Smoke test job (Tier 2.5; build + JSON-RPC + cleanup)                    | 7ba5871 |
 | ✅     |     | CI-8 | Trivy hard-gate (`exit-code: 1`) once `.trivyignore` is justified        | 8295863 |
+| 🔴     | P3  | CI-9 | Repo cruft sweep: inventory every top-level file/dir (excl. `tidal-connect/src/`), classify each as needed / removable / needs-user-decision with evidence, then delete the confirmed-removable set in one `chore:` commit. Obvious suspects to triage: `docker-compose.debian11.yml`, `tidal-connect/Dockerfile.debian11-vendored`, `tidal-connect/build_docker.sh`, `package.json`, `img/`, unused `tests/` fixtures. Hard constraints from AGENTS.md §2 apply. | — |
 
 ## security-hardener
 

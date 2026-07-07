@@ -156,6 +156,30 @@ In order of expected payoff, not size:
 7. **Smoke test job.** Boot `tidal-connect:ci-<arch>` under QEMU, wait
    30 s, `docker top` to confirm `tidal_connect_application` is alive,
    collect stdout/stderr as artifact.
+8. **Repo cruft sweep.** Two phases in one task. **Phase A —
+   inventory:** walk every top-level file and directory (excluding
+   `tidal-connect/src/` which is vendor-locked per AGENTS.md §2) and
+   classify each entry as *needed* / *candidate for removal* /
+   *needs-user-decision*. Deliver the inventory as a table in the PR
+   description (or a scratch note the user can review) with the
+   evidence for each classification — e.g. "referenced by
+   `docker-compose.yml` line N", "referenced by
+   [.github/workflows/ci.yml](../workflows/ci.yml)", "no inbound
+   references found by `grep_search`". Pay attention to obvious
+   suspects like `docker-compose.debian11.yml`,
+   `tidal-connect/Dockerfile.debian11-vendored`,
+   `tidal-connect/build_docker.sh`, `package.json`, orphaned files
+   under `img/`, and anything under `tests/` no longer wired into CI.
+   **Phase B — cleanup:** after the user confirms the classification,
+   delete the *candidate for removal* set in one commit
+   (`chore: remove unused <category>`), update `.dockerignore` /
+   [AGENTS.md](../../AGENTS.md) references if any of the removals
+   invalidate documented paths, and re-run `docker compose config -q`
+   + the `lint` job locally to prove nothing regressed. Do **not**
+   touch `tidal-connect/src/bin/`, `tidal-connect/src/licenses/`, or
+   `tidal-connect/src/id_certificate/` — those are AGENTS.md §2 hard
+   constraints. If a candidate is a Compose file, verify no CI
+   workflow or docs page references it before removal.
 
 Pick **one** of the above per task invocation. Do not bundle.
 
