@@ -1,5 +1,9 @@
 FROM raspbian/stretch
 
+# EOL legacy.raspbian.org mirror is intermittently unreachable (CI run 36903516263, 2026-10-01).
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::http::ResponseTimeout "30";\n' \
+    > /etc/apt/apt.conf.d/80-retries
+
 # Update apt sources and install required dependencies
 RUN echo 'deb http://archive.raspberrypi.org/debian/ stretch main' > /etc/apt/sources.list && \
     echo 'deb http://legacy.raspbian.org/raspbian stretch main contrib non-free rpi firmware' >> /etc/apt/sources.list && \
