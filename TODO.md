@@ -25,7 +25,7 @@
 >   without flipping a row to 🟡, you're freelancing.
 > - `Active` block below mirrors the current 🟡 row for fast scanning.
 >
-> Last refresh: 2026-10-01 (add MISC-4: spin-off project idea for x86-only single-container deployment; no change to this repo).
+> Last refresh: 2026-10-01 (close CI-9: partial cruft sweep — remove orphaned build_docker.sh, keep BASE-2 + MISC-4 dependencies).
 
 ## Active
 
@@ -43,7 +43,7 @@ _(no active task — pick a `P1` row below and flip its Status to 🟡)_
 | ✅     |     | CI-6 | Trivy scan job + `.trivyignore`                                          | 7586ff7 |
 | ✅     |     | CI-7 | Smoke test job (Tier 2.5; build + JSON-RPC + cleanup)                    | 7ba5871 |
 | ✅     |     | CI-8 | Trivy hard-gate (`exit-code: 1`) once `.trivyignore` is justified        | 8295863 |
-| 🔴     | P3  | CI-9 | Repo cruft sweep: inventory every top-level file/dir (excl. `tidal-connect/src/`), classify each as needed / removable / needs-user-decision with evidence, then delete the confirmed-removable set in one `chore:` commit. Obvious suspects to triage: `docker-compose.debian11.yml`, `tidal-connect/Dockerfile.debian11-vendored`, `tidal-connect/build_docker.sh`, `package.json`, `img/`, unused `tests/` fixtures. Hard constraints from AGENTS.md §2 apply. | — |
+| ✅     | P3  | CI-9 | Repo cruft sweep. Removed: `tidal-connect/build_docker.sh` (orphan SSH deploy helper). **Intentionally kept** (contrary to original "obvious suspects" list): `tidal-connect/Dockerfile.debian11-vendored` + `docker-compose.debian11.yml` (validated BASE-2 pair + MISC-4 spin-off template), `img/` (design artwork for future architecture docs), `tests/smoke/mock-snapserver.py` (used by CI). `package.json` / `package-lock.json` / `node_modules/` are gitignored, not tracked. See commit message for full rationale. | c28d0f0 |
 
 ## security-hardener
 
