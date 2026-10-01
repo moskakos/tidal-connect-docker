@@ -1,35 +1,48 @@
-# Proposal: single-container x86-base deployment
+# Proposal: single-container x86-base deployment (spin-off)
 
-> **Status:** 🔴 Proposal only — no implementation, no branch, no CI.
+> **Status:** 🔴 Idea captured for future spin-off project — **not** a
+> change to this repository.
+> **Scope decision (2026-10-01):** when/if this idea is pursued, it will
+> be developed in a **separate repository**, not merged into
+> `tidal-connect-docker`. This repo stays platform-agnostic (supports
+> both x86 Docker host via ARM emulation and native ARM hardware).
 > **Author:** chat discussion 2026-10-01.
-> **Related:** [AGENTS.md](../AGENTS.md) §1 (project context), §2 (hard
-> constraints), BASE-2 ([tidal-connect/Dockerfile.debian11-vendored](../tidal-connect/Dockerfile.debian11-vendored)).
+> **Related:** [AGENTS.md](../AGENTS.md) §2 (hard constraints — library
+> matrix carries over verbatim), BASE-2
+> ([tidal-connect/Dockerfile.debian11-vendored](../tidal-connect/Dockerfile.debian11-vendored))
+> as the vendoring template.
 
 ## Why this proposal exists
 
-AGENTS.md §1 currently frames the project as "TIDAL Connect for Snapcast
-multi-room audio on ARM Linux", with Raspberry Pi as the implied
-production target. In reality, as of 2026-10, **the primary (and only)
-deployment target is an x86 Docker host** — the `tidal-dev` Proxmox VM
-and any other x86 machine with Docker + binfmt_misc. ARM-native SBC
-(Raspberry Pi) is a *possible future direction*, not a current need, and
-no such hardware is on hand or planned.
+A single combined container with an **amd64 base** and **vendored armhf
+libraries** for the vendor binary is technically possible and would be
+significantly lighter when deployed on an x86 Docker host — the common
+dev/test environment today (`tidal-dev` Proxmox VM, GitHub Actions
+amd64 runners under QEMU shim).
 
-This reframes the trade-offs around container structure:
+The project `tidal-connect-docker` itself remains **platform-agnostic**:
+multi-arch build matrix (`linux/arm/v7`, `linux/arm64`), two-container
+Compose, runs on both x86 Docker hosts via ARM emulation and native ARM
+hardware. No changes to this project are proposed by this document.
 
-- The two-container model (`tidal-connect` armhf + `forwarder-arecord`
-  amd64) was motivated partly by **image portability to a real Pi**.
-- If Pi is not the current target, that motivation drops significantly.
-- The vendor binary's armhf nature is a per-process constraint, not a
-  whole-container one. User-mode QEMU (`qemu-arm-static` + binfmt_misc)
-  translates ARM userspace instructions to x86 per-process, with
-  syscalls thunked directly to the host x86 kernel. No full-system
-  emulation, no VM.
+What this document captures is the **design of a potential sibling
+project** whose single purpose is "run TIDAL Connect + Snapcast forwarder
+on an x86 Docker host, as cheaply as possible, with zero intent of
+targeting native ARM hardware".
 
-Conclusion: on x86 hosts, a **single combined container with an amd64
-base and vendored armhf libraries for the vendor binary** is both
-technically clean and arguably more aligned with how the project
-actually runs today.
+### Key insight behind the idea
+
+The vendor binary's armhf nature is a **per-process constraint**, not a
+whole-container one. User-mode QEMU (`qemu-arm-static` + binfmt_misc)
+translates ARM userspace instructions to x86 per-process, with syscalls
+thunked directly to the host x86 kernel. There is no full-system
+emulation and no VM. Everything that is not the vendor binary can
+therefore run as native x86.
+
+This means a combined container with an amd64 base and vendored armhf
+libs can emulate only `tidal_connect_application` /
+`speaker_controller_application`, while the forwarder (`arecord`,
+`socat`), Avahi, and process supervision run natively.
 
 ## Architecture outline
 
@@ -232,38 +245,49 @@ Flagged for the implementation phase, not blockers for the idea:
 
 ## Future direction: Pi support, if ever
 
-If/when a Pi (or any ARM-native SBC) joins the deployment set, the
-cleanest path is **parallel image, not dual-arch combined image**:
+A hypothetical spin-off repo starts x86-only by design. If an
+ARM-native deployment ever becomes relevant to that project, the
+cleanest options at that point are:
 
-- `Dockerfile.combined-x86` (this proposal) — amd64 base + vendored
-  armhf libs + supervisord + qemu-arm-static. Primary.
-- `Dockerfile.pi` — armhf base (Debian 9 or whatever BASE-2 lands on),
-  no supervisord (two containers via Compose on Pi), no qemu, no
-  vendored libs (native lib path). Essentially current `tidal-connect/`
-  + `forwarder-arecord/` Dockerfiles merged by nothing beyond compose.
-- Shared assets (`entrypoint-vendor.sh`, `entrypoint-forwarder.sh`,
-  JSON-RPC helpers) live in a `shared/` directory, `COPY`'d into both.
-- `docker-compose.yml` for Pi runs two services; `docker-compose.yml`
-  for x86 runs one. Minor duplication; no architectural coupling.
+- Keep the spin-off x86-only and continue using **this** repo
+  (`tidal-connect-docker`) for ARM-native hardware. The two projects
+  cover different deployment shapes.
+- Or, in the spin-off repo, add a parallel `Dockerfile.pi` (armhf
+  base, no supervisord, no qemu, no vendored libs — essentially this
+  repo's current `tidal-connect/` + `forwarder-arecord/` Dockerfiles
+  merged by nothing beyond compose). Shared assets live in a
+  `shared/` directory, `COPY`'d into both.
 
-Zero cost today because this proposal is x86-only. Flagged only to show
-Pi is not permanently excluded.
+Not a decision for today. Flagged only to show Pi is not permanently
+excluded from the eventual spin-off either.
 
 ## Status and next steps
 
-- **Current status:** 🔴 proposal, not scheduled, no owner assigned.
-- **Prerequisite reads before any work starts:**
-  - [AGENTS.md](../AGENTS.md) §2 (library matrix)
-  - [tidal-connect/Dockerfile.debian11-vendored](../tidal-connect/Dockerfile.debian11-vendored) (vendoring template)
-  - [forwarder-arecord/entrypoint.sh](../forwarder-arecord/entrypoint.sh) (forwarder logic to inline)
-  - [docs/performance-baseline.md](performance-baseline.md) (what to beat)
-- **First concrete milestone (when scheduled):** proof-of-concept
-  Dockerfile that builds amd64 image, bundles Debian 9 armhf libs,
-  runs vendor binary via `qemu-arm-static` with `ldd` showing no
-  `not found`, 60-second runtime smoke test. Equivalent of BASE-2 in
-  CI, but on amd64.
-- **Decision gate:** real-world smoke test on tidal-dev — TIDAL phone
-  app discovers device and plays audio via Snapcast. Only after that
-  does this replace the current two-container setup.
+- **Current status:** 🔴 idea captured, no spin-off repo exists.
+  **This repo (`tidal-connect-docker`) will not implement the idea** —
+  it stays platform-agnostic.
+- **When pursued:** create a new repo (name TBD, e.g.
+  `tidal-connect-x86`), seed it with a copy of this document, and
+  start from the BASE-2 Dockerfile template adapted to amd64 base.
+- **Prerequisite reads at that point:**
+  - This document in full.
+  - [AGENTS.md](../AGENTS.md) §2 of **this** repo (library matrix) —
+    carries over verbatim to the spin-off.
+  - [tidal-connect/Dockerfile.debian11-vendored](../tidal-connect/Dockerfile.debian11-vendored)
+    (vendoring template to adapt from armhf base to amd64 base).
+  - [forwarder-arecord/entrypoint.sh](../forwarder-arecord/entrypoint.sh)
+    (forwarder logic to inline).
+  - [docs/performance-baseline.md](performance-baseline.md) (what to
+    beat).
+- **First concrete milestone in the spin-off repo (when scheduled):**
+  proof-of-concept Dockerfile that builds amd64 image, bundles Debian 9
+  armhf libs, runs vendor binary via `qemu-arm-static` with `ldd`
+  showing no `not found`, 60-second runtime smoke test. Equivalent of
+  BASE-2 in CI, but on amd64.
+- **Decision gate in the spin-off repo:** real-world smoke test on an
+  x86 Docker host — TIDAL phone app discovers device and plays audio
+  via Snapcast.
 
-Tracking row: `MISC-4` in [TODO.md](../TODO.md).
+Tracking row: `MISC-4` in [TODO.md](../TODO.md) (lives here as a
+"remember this exists" hook — not as a task scheduled against this
+repo).
