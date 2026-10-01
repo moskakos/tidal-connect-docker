@@ -1,0 +1,27 @@
+// Workspace-scoped MCP server registrations.
+//
+// `jq` server: thin wrapper around the `jq` CLI for JSON querying. Lets
+// the assistant (and subagents) parse MCP-result JSON files without
+// terminal-approval friction for each `jq` invocation.
+//
+// The server's source lives under node_modules/ (gitignored). To
+// reproduce on a fresh clone, run:
+//   npm install --no-save @247arjun/mcp-jq
+// (Both package.json and node_modules/ are gitignored to keep the
+// repo node-toolchain-free; the install is a personal dev convenience,
+// not part of the shipped project.)
+//
+// VS Code picks this up automatically when the folder is opened.
+// If the server doesn't appear, run `MCP: List Servers` from the
+// command palette and start it manually, or reload the window.
+{
+  "servers": {
+    "jq": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/node_modules/@247arjun/mcp-jq/build/index.js"
+      ]
+    }
+  }
+}

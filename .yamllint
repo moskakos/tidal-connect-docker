@@ -1,0 +1,24 @@
+---
+# yamllint config for tidal-connect-docker
+# Tuned for Docker Compose and GitHub Actions conventions.
+
+extends: default
+
+rules:
+  # Compose files and GH Actions workflows don't conventionally use `---`.
+  document-start: disable
+
+  # Allow slightly longer lines; CI workflow shell snippets need headroom.
+  line-length:
+    max: 120
+    level: error
+
+  # GitHub Actions uses `on:` as a top-level key; default rule flags it
+  # as a truthy value. Limit truthy checks to values, not keys.
+  truthy:
+    check-keys: false
+
+  # Commented-out config lines like `#build:` are a common pattern in
+  # Compose files; allow them without forcing a leading space.
+  comments:
+    require-starting-space: false

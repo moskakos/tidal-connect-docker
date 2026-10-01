@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   tidal-connect:
     image: moskakos/tidal-connect
@@ -7,6 +6,8 @@ services:
     #  context: .
     #  dockerfile: Docker/Dockerfile
     restart: always
+    security_opt:
+      - "no-new-privileges:true"
     devices:
       - /dev/snd
     network_mode: host
@@ -22,12 +23,21 @@ services:
       - /dev/shm:/dev/shm
       - /etc/timezone:/etc/timezone:ro
 
-  tidal-forwarder:
-    image: linuxserver/ffmpeg:latest
-    container_name: tidal-forwarder
+  tidal-forwarder-arecord:
+    build:
+      context: forwarder-arecord
+      dockerfile: Dockerfile
+    container_name: tidal-forwarder-arecord
     depends_on:
       - tidal-connect
     restart: always
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
     network_mode: host
     devices:
       - /dev/snd
@@ -36,21 +46,17 @@ services:
       - SNAPSERVER_API_PORT=1780
       - STREAM_PORT=5000
       - STREAM_NAME=Tidal
-      # Audio format for FFmpeg, e.g. flac or s16le for PCM
-      - FFMPEG_AUDIO_FORMAT=s16le
-      # Audio codec for FFmpeg, e.g. flac or pcm_s16le for PCM
-      - FFMPEG_AUDIO_CODEC=pcm_s16le
-      # Audio codec for Snapcast stream, e.g. flac or pcm
-      # See https://github.com/badaix/snapcast/blob/develop/doc/configuration.md
-      - SC_AUDIO_CODEC=pcm
       - AUDIO_DEVICE=plughw:Loopback,0
       - SAMPLE_RATE=44100
       - CHANNELS=2
-      - BUFFER_SIZE=1024
-      - AUDIO_BUFFER=2048
-      - FLAC_COMPRESSION_LEVEL=8
+      # ALSA capture buffering (microseconds). Defaults reproduce the
+      # snd-aloop autopicked values (125 ms period, 500 ms buffer = 4
+      # periods) and keep idle CPU low. To tune, edit the two values
+      # below in sync — BUFFER_TIME must be a small integer multiple
+      # of PERIOD_TIME (typically 2..8); ALSA rounds otherwise. The
+      # forwarder logs the requested values on startup.
+      - PERIOD_TIME=125000   # 125 ms period
+      - BUFFER_TIME=500000   # 500 ms buffer (4 periods)
     volumes:
       - /dev/shm:/dev/shm
       - /etc/timezone:/etc/timezone:ro
-      - ./ffmpeg/entrypoint.sh:/entrypoint.sh:ro
-    entrypoint: /bin/bash /entrypoint.sh

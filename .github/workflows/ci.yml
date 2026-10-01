@@ -1,0 +1,314 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Hadolint (tidal-connect/Dockerfile)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: tidal-connect/Dockerfile
+          failure-threshold: error
+
+      - name: Hadolint (forwarder-arecord/Dockerfile)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: forwarder-arecord/Dockerfile
+          failure-threshold: error
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+        with:
+          scandir: "."
+          severity: error
+          format: gcc
+
+      - name: docker compose config
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: yamllint
+        run: |
+          python3 -m pip install --quiet 'yamllint==1.37.1'
+          yamllint .
+
+  build-and-ldd:
+    name: Build & ldd (${{ matrix.arch }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # arm64 is the only CI target: it exercises armhf image content
+          # under arm64-host QEMU emulation, which mirrors how the vendor
+          # binary runs on modern 64-bit Raspberry Pi hosts (Pi 3 and up,
+          # all 64-bit-capable). See AGENTS.md §2 for the armhf-only
+          # vendor-binary constraint and why native armv7 CI adds no signal.
+          - platform: linux/arm64
+            arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build tidal-connect image (${{ matrix.platform }})
+        uses: docker/build-push-action@v5
+        with:
+          context: tidal-connect
+          file: tidal-connect/Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: tidal-connect:ci-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.arch }},mode=max
+
+      - name: Verify shared-library resolution (ldd)
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          out="artifacts/ldd-${{ matrix.arch }}.txt"
+          docker run --rm --platform ${{ matrix.platform }} \
+            --entrypoint /bin/bash tidal-connect:ci-${{ matrix.arch }} \
+            -c 'ldd /app/ifi-tidal-release/bin/tidal_connect_application' \
+            | tee "$out"
+          if grep -E 'not found' "$out" > /dev/null; then
+            echo "::error::Unresolved shared libraries in tidal_connect_application on ${{ matrix.platform }}"
+            exit 1
+          fi
+          echo "All shared libraries resolved on ${{ matrix.platform }}"
+
+      - name: Trivy scan (tidal-connect:ci-${{ matrix.arch }})
+        # CI-8 (TODO.md): hard-gate. Any HIGH/CRITICAL finding that
+        # is fixable AND not allowlisted in .trivyignore fails the
+        # build. ignore-unfixed: true keeps EOL CVEs with no patch
+        # path out of the gate (large share of Debian-9 noise); we
+        # can only act on fixables. The current allowlist is anchored
+        # by AGENTS.md §2 (vendor binary symbol-version lock) — see
+        # the .trivyignore header for the full rationale.
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: tidal-connect:ci-${{ matrix.arch }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - name: Upload ldd report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldd-${{ matrix.arch }}
+          path: artifacts/
+          retention-days: 14
+
+  smoke-arecord:
+    # Smoke test for the arecord forwarder. This is the GitHub-hosted
+    # subset of AGENTS.md §5 Tier 3 (Synthetic E2E): we build the image
+    # native, run it against a mock Snapserver, and verify that the
+    # entrypoint negotiates Stream.AddStream successfully and shuts
+    # down cleanly via its EXIT trap.
+    #
+    # Byte-flow validation (arecord -> socat -> mock TCP) is omitted
+    # here on purpose: the ubuntu-latest runner uses the Azure-tuned
+    # kernel, which is built WITHOUT snd-aloop (and the other ALSA
+    # loopback modules). See /memories/repo/github-runner-no-snd-aloop.md
+    # for the verification. End-to-end audio is exercised manually on
+    # the real hardware and could be added later on a self-hosted
+    # runner that uses a generic kernel.
+    #
+    # SECURITY REMINDER for anyone adding that self-hosted byte-flow
+    # job (MISC-1): this is a public repo, so any self-hosted job MUST
+    # carry the fork-PR guard. Copy verbatim:
+    #
+    #   smoke-byteflow:
+    #     if: |
+    #       github.event_name != 'pull_request' ||
+    #       github.event.pull_request.head.repo.full_name == github.repository
+    #     runs-on: [self-hosted, tidal-dev]
+    #     ...
+    #
+    # Without that `if:` a fork PR's malicious workflow modification
+    # would execute on `tidal-dev`. See /memories/repo/tidal-dev-runner.md
+    # for the full runner security posture.
+    name: Smoke test (forwarder-arecord)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build forwarder-arecord (linux/amd64)
+        uses: docker/build-push-action@v5
+        with:
+          context: forwarder-arecord
+          file: forwarder-arecord/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: tidal-forwarder-arecord:ci
+          cache-from: type=gha,scope=forwarder-arecord-amd64
+          cache-to: type=gha,scope=forwarder-arecord-amd64,mode=max
+
+      - name: Start mock Snapserver
+        run: |
+          set -euo pipefail
+          mkdir -p smoke-out
+          nohup python3 tests/smoke/mock-snapserver.py smoke-out \
+            > smoke-out/mock.log 2>&1 &
+          echo $! > smoke-out/mock.pid
+          # Wait for both listeners to come up (5 s max).
+          for _ in $(seq 1 10); do
+            if ss -ltn | grep -q ':1780 ' && ss -ltn | grep -q ':5000 '; then
+              echo "mock Snapserver listening on 1780 and 5000"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "::error::Mock Snapserver did not start in time"
+          cat smoke-out/mock.log || true
+          exit 1
+
+      - name: Run forwarder container (with production hardening)
+        run: |
+          set -euo pipefail
+          # Mirror the docker-compose.yml hardening so the smoke test
+          # catches regressions in cap_drop / read_only / tmpfs. No
+          # /dev/snd is mounted: arecord will fail fast inside, and
+          # the entrypoint's EXIT trap will run cleanup -- which is
+          # exactly what we want to verify, alongside AddStream.
+          docker run -d --name forwarder-smoke \
+            --network host \
+            --security-opt no-new-privileges:true \
+            --cap-drop ALL \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
+            -e SNAPSERVER_HOST=localhost \
+            -e SNAPSERVER_API_PORT=1780 \
+            -e STREAM_PORT=5000 \
+            -e STREAM_NAME=Tidal \
+            -e AUDIO_DEVICE=plughw:Loopback,0 \
+            tidal-forwarder-arecord:ci
+          # Poll for AddStream up to 15 s. The entrypoint hits the
+          # mock within ~1-2 s on a warm runner.
+          for _ in $(seq 1 30); do
+            if grep -q 'Stream.AddStream' smoke-out/rpc.log 2>/dev/null; then
+              echo "AddStream observed after $(($(date +%s) % 60))s"
+              break
+            fi
+            sleep 0.5
+          done
+          # Give the container another moment to exit cleanly via its
+          # trap (RemoveStream + exit 0) once arecord fails.
+          sleep 3
+          docker ps -a --filter name=forwarder-smoke
+          docker logs forwarder-smoke
+
+      - name: Verify smoke criteria
+        run: |
+          set -euo pipefail
+          # 1) Mock Snapserver received Stream.AddStream.
+          if ! grep -q 'Stream.AddStream' smoke-out/rpc.log; then
+            echo "::error::Stream.AddStream JSON-RPC not received by mock"
+            cat smoke-out/rpc.log 2>/dev/null || true
+            exit 1
+          fi
+          echo "Stream.AddStream JSON-RPC received (ok)"
+
+          # 2) Mock also received Stream.RemoveStream from cleanup.
+          # Two RemoveStream calls are expected: one pre-clear at
+          # startup, one from the EXIT trap during shutdown.
+          remove_count=$(grep -c 'Stream.RemoveStream' smoke-out/rpc.log || true)
+          if [ "${remove_count:-0}" -lt 2 ]; then
+            echo "::error::Expected >=2 Stream.RemoveStream (pre-clear + cleanup), got ${remove_count:-0}"
+            cat smoke-out/rpc.log
+            exit 1
+          fi
+          echo "Stream.RemoveStream calls observed: $remove_count (ok)"
+
+          # 3) Container exited cleanly (entrypoint trap reached exit 0).
+          exit_code=$(docker inspect -f '{{.State.ExitCode}}' forwarder-smoke)
+          state=$(docker inspect -f '{{.State.Status}}' forwarder-smoke)
+          echo "container final state: status=$state exit=$exit_code"
+          if [ "$state" != "exited" ] || [ "$exit_code" != "0" ]; then
+            echo "::error::Container did not exit cleanly (expected exited/0)"
+            exit 1
+          fi
+          echo "container exited cleanly via EXIT trap (ok)"
+
+          # 4) Image carries a HEALTHCHECK directive. We cannot observe
+          # the probe's runtime result here (the container exits when
+          # arecord fails without /dev/snd, before Docker's first
+          # probe), but verifying the image-level declaration catches
+          # accidental removal of the HEALTHCHECK line in the Dockerfile.
+          hc=$(docker inspect -f '{{range .Config.Healthcheck.Test}}{{.}} {{end}}' tidal-forwarder-arecord:ci)
+          echo "image HEALTHCHECK: $hc"
+          if ! echo "$hc" | grep -q 'pgrep'; then
+            echo "::error::Image does not declare a pgrep-based HEALTHCHECK"
+            exit 1
+          fi
+          echo "HEALTHCHECK declared in image (ok)"
+
+      - name: Trivy scan (tidal-forwarder-arecord:ci)
+        # CI-8 (TODO.md): hard-gate, same policy as the tidal-connect
+        # scan in build-and-ldd. Alpine base — no allowlisted CVEs as
+        # of the CI-6 baseline (run 28457038986, image clean).
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: tidal-forwarder-arecord:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+      - name: Collect container logs
+        if: always()
+        run: |
+          docker logs forwarder-smoke > smoke-out/container.log 2>&1 || true
+          ls -la smoke-out/ || true
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-arecord
+          path: smoke-out/
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker rm -f forwarder-smoke 2>/dev/null || true
+          if [ -f smoke-out/mock.pid ]; then
+            kill "$(cat smoke-out/mock.pid)" 2>/dev/null || true
+          fi

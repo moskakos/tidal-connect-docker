@@ -1,0 +1,37 @@
+// Workspace-scoped toolset for tidal-connect-docker.
+//
+// Moved here from user-scope (~/Library/Application Support/Code/User/prompts/)
+// because this toolset is project-specific: it targets the shell + Docker work
+// in this repo, not a general-purpose chat configuration.
+//
+// Tools included:
+// - Aliases: agent, edit, execute, read, search, vscode, web, todo
+// - GitHub MCP: github/* (PR ops, repo metadata), github-actions/* (CI runs, job logs)
+// - jq MCP: jq/* (parse MCP-result JSON without terminal-jq friction)
+//
+// Intentionally NOT included (out of scope for this project):
+// - browser (no UI automation needed)
+// - pylance-mcp-server/* + ms-python.python/* (no Python in this repo)
+//
+// Reminder: toolsets affect the MAIN THREAD assistant only. Subagents get
+// their tools from .github/agents/<name>.agent.md frontmatter `tools:` —
+// see /memories/session/subagent-mcp-access.md for the empirical evidence.
+{
+  "tidal-connect-docker": {
+    "tools": [
+      "agent",
+      "edit",
+      "execute",
+      "read",
+      "search",
+      "vscode",
+      "web",
+      "todo",
+      "github/*",
+      "github-actions/*",
+      "jq/*"
+    ],
+    "description": "tidal-connect-docker orkestraattori: GitHub PR/CI, jq, shell + Docker. Subagent-tuki (agent), web. Ei Python/browser-tarpeita.",
+    "icon": "tools"
+  }
+}

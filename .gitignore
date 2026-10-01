@@ -1,2 +1,15 @@
 Docker/.env
 *.tar
+
+# Locally downloaded GitHub Actions logs / artifacts (kept for reference,
+# never committed). See AGENTS.md §2 — the ldd output under here is the
+# ground truth for the binary's library requirements.
+artefact-*/
+artifacts/
+
+# Local-only Node.js dev convenience: the jq MCP server (registered in
+# .vscode/mcp.json) lives under node_modules/. Not part of the shipped
+# project — see .vscode/mcp.json comment for reinstall instructions.
+node_modules/
+package.json
+package-lock.json
